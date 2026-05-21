@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
+import { getAuth, connectAuthEmulator } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
@@ -15,9 +16,11 @@ const app = initializeApp(firebaseConfig);
 
 export const db        = getFirestore(app);
 export const functions = getFunctions(app, import.meta.env.VITE_FIREBASE_REGION ?? "us-central1");
+export const auth      = getAuth(app);
 
-// Local emulator support: set VITE_USE_EMULATOR=true
 if (import.meta.env.VITE_USE_EMULATOR === "true") {
   connectFirestoreEmulator(db, "localhost", 8080);
   connectFunctionsEmulator(functions, "localhost", 5001);
+  connectAuthEmulator(auth, "http://localhost:9099", { disableWarnings: true });
 }
+

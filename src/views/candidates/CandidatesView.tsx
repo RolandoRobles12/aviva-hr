@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useCandidates } from "@/hooks/useCandidates";
 import { updateCandidateStage } from "@/services/candidates";
-import { STAGES, GROUP_META, stageMeta, hubLabel, DOC_TYPES } from "@/data/mock";
+import { useCatalog } from "@/context/CatalogContext";
 import type { Candidate } from "@/data/types";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
@@ -23,18 +23,25 @@ const TABS = [
 
 const STAGE_ORDER = ["offer", "documents", "contract", "accounts", "induction"];
 
+function DocStatusIcon({ status }: { status: string }) {
+  if (status === "ok")       return <CheckCircle2 size={14} className="text-green-500 shrink-0" />;
+  if (status === "review")   return <Clock size={14} className="text-amber-500 shrink-0" />;
+  if (status === "rejected") return <XCircle size={14} className="text-red-500 shrink-0" />;
+  return <div className="size-3.5 rounded-full border-2 border-[var(--color-line)] shrink-0" />;
+}
+
 function DocProgress({ docs }: { docs: Candidate["docs"] }) {
-  const required = DOC_TYPES.filter((d) => d.required).length;
+  const { docTypes } = useCatalog();
+  const required = docTypes.filter((d) => d.required).length;
   const ok = docs.filter((d) => d.status === "ok").length;
   if (docs.length === 0) return <span className="text-[var(--color-ink-4)] text-xs">—</span>;
   return (
-    <span className="text-[12.5px] font-mono text-[var(--color-ink-3)]">
-      {ok}/{required}
-    </span>
+    <span className="text-[12.5px] font-mono text-[var(--color-ink-3)]">{ok}/{required}</span>
   );
 }
 
 function StageProgress({ stage }: { stage: string }) {
+  const { stageMeta } = useCatalog();
   const meta = stageMeta(stage);
   if (!meta) return null;
   const groupIdx = STAGE_ORDER.indexOf(meta.group);
@@ -49,14 +56,8 @@ function StageProgress({ stage }: { stage: string }) {
   );
 }
 
-function DocStatusIcon({ status }: { status: string }) {
-  if (status === "ok")       return <CheckCircle2 size={14} className="text-green-500 shrink-0" />;
-  if (status === "review")   return <Clock size={14} className="text-amber-500 shrink-0" />;
-  if (status === "rejected") return <XCircle size={14} className="text-red-500 shrink-0" />;
-  return <div className="size-3.5 rounded-full border-2 border-[var(--color-line)] shrink-0" />;
-}
-
 function CandidateDetail({ candidate, onClose }: { candidate: Candidate; onClose: () => void }) {
+  const { stages, stageMeta, hubLabel, docTypes } = useCatalog();
   const stage = stageMeta(candidate.stage);
   const hub   = hubLabel(candidate.hub);
 
@@ -90,29 +91,23 @@ function CandidateDetail({ candidate, onClose }: { candidate: Candidate; onClose
           ))}
         </div>
 
-        {/* Stage change */}
         <div>
-          <h3 className="text-[11px] font-semibold uppercase tracking-widest text-[var(--color-ink-4)] mb-2">
-            Cambiar etapa
-          </h3>
+          <h3 className="text-[11px] font-semibold uppercase tracking-widest text-[var(--color-ink-4)] mb-2">Cambiar etapa</h3>
           <select
             value={candidate.stage}
             onChange={(e) => handleStageChange(e.target.value)}
             className="w-full h-8 px-2 text-[13px] rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)] outline-none"
           >
-            {STAGES.map((s) => (
+            {stages.map((s) => (
               <option key={s.id} value={s.id}>{s.label}</option>
             ))}
           </select>
         </div>
 
-        {/* Documents */}
         <div>
-          <h3 className="text-[11px] font-semibold uppercase tracking-widest text-[var(--color-ink-4)] mb-3">
-            Documentos
-          </h3>
+          <h3 className="text-[11px] font-semibold uppercase tracking-widest text-[var(--color-ink-4)] mb-3">Documentos</h3>
           <div className="space-y-2">
-            {DOC_TYPES.map((dt) => {
+            {docTypes.map((dt) => {
               const docEntry = candidate.docs.find((d) => d.id === dt.id);
               const status   = docEntry?.status ?? "pending";
               return (
@@ -126,11 +121,8 @@ function CandidateDetail({ candidate, onClose }: { candidate: Candidate; onClose
           </div>
         </div>
 
-        {/* Timeline */}
         <div>
-          <h3 className="text-[11px] font-semibold uppercase tracking-widest text-[var(--color-ink-4)] mb-3">
-            Historial
-          </h3>
+          <h3 className="text-[11px] font-semibold uppercase tracking-widest text-[var(--color-ink-4)] mb-3">Historial</h3>
           <div className="space-y-3">
             {candidate.timeline.map((event, i) => (
               <div key={i} className="flex gap-3">
@@ -164,15 +156,14 @@ function CandidateDetail({ candidate, onClose }: { candidate: Candidate; onClose
 
 export function CandidatesView() {
   const { data: candidates, loading, error } = useCandidates();
+  const { stageMeta, groupMeta } = useCatalog();
   const [tab, setTab]         = useState("all");
   const [query, setQuery]     = useState("");
   const [selected, setSelected] = useState<(Candidate & { id: string }) | null>(null);
 
   const filtered = useMemo(() => {
     let list = candidates;
-    if (tab !== "all") {
-      list = list.filter((c) => stageMeta(c.stage)?.group === tab);
-    }
+    if (tab !== "all") list = list.filter((c) => stageMeta(c.stage)?.group === tab);
     if (query.trim()) {
       const q = query.toLowerCase();
       list = list.filter(
@@ -184,7 +175,7 @@ export function CandidatesView() {
       );
     }
     return list;
-  }, [candidates, tab, query]);
+  }, [candidates, tab, query, stageMeta]);
 
   const counts = useMemo(() => {
     const map: Record<string, number> = { all: candidates.length };
@@ -193,7 +184,7 @@ export function CandidatesView() {
       if (meta?.group) map[meta.group] = (map[meta.group] ?? 0) + 1;
     }
     return map;
-  }, [candidates]);
+  }, [candidates, stageMeta]);
 
   if (loading) return <LoadingView />;
   if (error)   return <ErrorView message={error.message} />;
@@ -267,9 +258,7 @@ export function CandidatesView() {
                   <td className="px-4 py-3 text-[var(--color-ink-2)] max-w-[180px]">
                     <span className="truncate block">{c.position}</span>
                   </td>
-                  <td className="px-4 py-3 text-[var(--color-ink-3)] whitespace-nowrap">
-                    {c.quiosco}, {c.estado}
-                  </td>
+                  <td className="px-4 py-3 text-[var(--color-ink-3)] whitespace-nowrap">{c.quiosco}, {c.estado}</td>
                   <td className="px-4 py-3">
                     {stage ? <Badge color={stage.color} bg={stage.bg}>{stage.label}</Badge> : <span className="text-[var(--color-ink-4)]">—</span>}
                   </td>
@@ -285,9 +274,7 @@ export function CandidatesView() {
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-4 py-16 text-center text-[var(--color-ink-4)] text-[13px]">
-                  Sin candidatos para esta etapa.
-                </td>
+                <td colSpan={9} className="px-4 py-16 text-center text-[var(--color-ink-4)] text-[13px]">Sin candidatos para esta etapa.</td>
               </tr>
             )}
           </tbody>
@@ -296,7 +283,7 @@ export function CandidatesView() {
 
       {/* Summary bar */}
       <div className="flex items-center gap-3 px-5 py-2.5 border-t border-[var(--color-line)] bg-[var(--color-surface)] shrink-0 text-[12px] text-[var(--color-ink-3)]">
-        {Object.entries(GROUP_META).map(([id, meta]) => {
+        {Object.entries(groupMeta).map(([id, meta]) => {
           const count = counts[id] ?? 0;
           if (count === 0) return null;
           return (
@@ -307,9 +294,7 @@ export function CandidatesView() {
             </div>
           );
         })}
-        <span className="ml-auto text-[var(--color-ink-4)]">
-          {filtered.length} de {candidates.length} candidatos
-        </span>
+        <span className="ml-auto text-[var(--color-ink-4)]">{filtered.length} de {candidates.length} candidatos</span>
       </div>
 
       {selected && <CandidateDetail candidate={selected} onClose={() => setSelected(null)} />}

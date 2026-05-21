@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
 import { useUsers } from "@/hooks/useUsers";
+import { useIntegrations } from "@/hooks/useIntegrations";
 import { updateUser } from "@/services/users";
-import { hubs, integrations } from "@/data/mock";
+import { useCatalog } from "@/context/CatalogContext";
 import type { User } from "@/data/types";
 import { Avatar } from "@/components/ui/Avatar";
 import { StatusBadge } from "@/components/ui/Badge";
@@ -17,11 +18,9 @@ const STATUS_LABELS: Record<string, string> = {
   offboarding: "En baja", suspended: "Suspendidos",
 };
 
-function hubLabel(id: string) {
-  return hubs.find((h) => h.id === id)?.label ?? id;
-}
-
 function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; allUsers: (User & { id: string })[]; onClose: () => void }) {
+  const { hubLabel } = useCatalog();
+  const { data: integrations } = useIntegrations();
   const [tab, setTab] = useState<"info" | "access" | "devices">("info");
   const manager = allUsers.find((u) => u.id === user.manager);
 
@@ -32,7 +31,6 @@ function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; 
   return (
     <Drawer open onClose={onClose} title={user.fullName} subtitle={`${user.role} · ${user.quiosco}, ${user.estado}`}>
       <div>
-        {/* Tabs */}
         <div className="flex border-b border-[var(--color-line)] px-6">
           {(["info", "access", "devices"] as const).map((t) => (
             <button key={t} onClick={() => setTab(t)}
@@ -47,7 +45,6 @@ function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; 
         <div className="px-6 py-5 space-y-5">
           {tab === "info" && (
             <>
-              {/* Avatar + status */}
               <div className="flex items-center gap-4">
                 <Avatar user={user} size="lg" />
                 <div>
@@ -56,7 +53,6 @@ function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; 
                 </div>
               </div>
 
-              {/* Info grid */}
               <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
                 {[
                   ["Email", user.email],
@@ -75,7 +71,6 @@ function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; 
                 ))}
               </div>
 
-              {/* Status change */}
               <div>
                 <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Estado en Aviva</label>
                 <select
@@ -150,6 +145,7 @@ function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; 
 }
 
 export function DirectoryView() {
+  const { hubs, hubLabel } = useCatalog();
   const { data: users, loading, error } = useUsers();
   const [tab, setTab]       = useState<"all" | "active" | "invited" | "offboarding" | "suspended">("all");
   const [query, setQuery]   = useState("");
@@ -187,9 +183,7 @@ export function DirectoryView() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Toolbar */}
       <div className="flex flex-col gap-0 border-b border-[var(--color-line)] bg-[var(--color-surface)] shrink-0">
-        {/* Status tabs + actions */}
         <div className="flex items-center gap-2 px-5 py-2">
           <div className="flex gap-0.5 overflow-x-auto">
             {STATUS_TABS.map((t) => (
@@ -210,7 +204,6 @@ export function DirectoryView() {
           </div>
         </div>
 
-        {/* Search + filters */}
         <div className="flex items-center gap-2 px-5 py-2 border-t border-dashed border-[var(--color-line)]">
           <div className="flex items-center gap-2 h-8 px-3 rounded-[var(--radius-sm)] bg-[var(--color-surface-2)] border border-[var(--color-line)] min-w-[220px]">
             <Search size={13} className="text-[var(--color-ink-4)] shrink-0" />
@@ -234,7 +227,6 @@ export function DirectoryView() {
         </div>
       </div>
 
-      {/* Table */}
       <div className="flex-1 overflow-auto">
         <table className="w-full min-w-[800px] border-collapse text-[13px]">
           <thead className="sticky top-0 z-10">

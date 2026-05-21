@@ -474,6 +474,56 @@ const appSettings = {
   defaultRecruiter: "u-002_03",
 };
 
+// ── Catalog: stages ───────────────────────────────────────────────────────
+
+const stages = [
+  { id: "offer_held",      label: "Oferta retenida",  group: "offer",     color: "#8a5a00", bg: "#fff5d6", desc: "Pendiente: salario o fecha en Viterbit.",       order: 0 },
+  { id: "offer_sent",      label: "Carta enviada",    group: "offer",     color: "#5c2e8e", bg: "#ece2f5", desc: "Esperando firma del candidato.",                 order: 1 },
+  { id: "offer_signed",    label: "Oferta firmada",   group: "offer",     color: "#026149", bg: "#e7f8ef", desc: "Firma recibida. Activando expediente.",          order: 2 },
+  { id: "invited",         label: "Invitado",         group: "documents", color: "#1b3f8a", bg: "#e3eeff", desc: "Enlace de documentos enviado.",                  order: 3 },
+  { id: "in_progress",     label: "En proceso",       group: "documents", color: "#b15a0c", bg: "#fbece0", desc: "Subiendo documentos.",                          order: 4 },
+  { id: "under_review",    label: "Revisión",         group: "documents", color: "#b15a0c", bg: "#fbece0", desc: "Documentos completos, revisando.",              order: 5 },
+  { id: "approved",        label: "Aprobado",         group: "documents", color: "#026149", bg: "#e7f8ef", desc: "Expediente aprobado.",                          order: 6 },
+  { id: "rejected",        label: "Rechazado",        group: "documents", color: "#a8200d", bg: "#ffe2dc", desc: "Expediente rechazado.",                         order: 7 },
+  { id: "contract_sent",   label: "Contrato enviado", group: "contract",  color: "#5c2e8e", bg: "#ece2f5", desc: "Pendiente de firma.",                           order: 8 },
+  { id: "contract_signed", label: "Contrato firmado", group: "contract",  color: "#026149", bg: "#e7f8ef", desc: "Listo para provisionar correos.",              order: 9 },
+  { id: "email_pending",   label: "Correo pendiente", group: "accounts",  color: "#b15a0c", bg: "#fbece0", desc: "Ticket IT abierto en Jira.",                   order: 10 },
+  { id: "email_ready",     label: "Correo listo",     group: "accounts",  color: "#026149", bg: "#e7f8ef", desc: "Provisionado. Listo para handoff a HR.",       order: 11 },
+  { id: "induction",       label: "Inducción",        group: "induction", color: "#1b3f8a", bg: "#e3eeff", desc: "En curso · ya es colaborador en HR.",          order: 12 },
+  { id: "disqualified",    label: "Descalificado",    group: "rejected",  color: "#6b716b", bg: "#f1f1ee", desc: "Descartado manualmente.",                       order: 13 },
+];
+
+const groupMeta = [
+  { id: "offer",     label: "Carta oferta", color: "#5c2e8e", bg: "#ece2f5" },
+  { id: "documents", label: "Documentos",   color: "#b15a0c", bg: "#fbece0" },
+  { id: "contract",  label: "Contrato",     color: "#5c2e8e", bg: "#ece2f5" },
+  { id: "accounts",  label: "Correos",      color: "#026149", bg: "#e7f8ef" },
+  { id: "induction", label: "Inducción",    color: "#1b3f8a", bg: "#e3eeff" },
+  { id: "rejected",  label: "Rechazados",   color: "#6b716b", bg: "#f1f1ee" },
+];
+
+const docTypes = [
+  { id: "acta_nacimiento",       label: "Acta de Nacimiento",             required: true,  order: 0 },
+  { id: "curp",                  label: "CURP",                           required: true,  order: 1 },
+  { id: "nss",                   label: "Número de Seguridad Social",     required: true,  order: 2 },
+  { id: "caratula_bancaria",     label: "Carátula Bancaria",              required: true,  order: 3 },
+  { id: "certificado_estudios",  label: "Certificado de Estudios",        required: true,  order: 4 },
+  { id: "constancia_fiscal",     label: "Constancia de Situación Fiscal", required: true,  order: 5 },
+  { id: "carta_recomendacion",   label: "Carta de Recomendación",         required: true,  order: 6 },
+  { id: "ine",                   label: "INE",                            required: true,  order: 7 },
+  { id: "comprobante_domicilio", label: "Comprobante de Domicilio",       required: true,  order: 8 },
+  { id: "foto_profesional",      label: "Fotografía",                     required: true,  order: 9 },
+  { id: "aviso_retencion",       label: "Aviso de Retención INFONAVIT",   required: false, condition: "tieneInfonavit", order: 10 },
+  { id: "estado_cuenta_fonacot", label: "Estado de cuenta FONACOT",       required: false, condition: "tieneFonacot",   order: 11 },
+];
+
+const estadosList = [
+  "México", "Hidalgo", "Veracruz", "Puebla", "Chiapas", "CDMX", "Tlaxcala",
+  "Morelos", "Querétaro", "Oaxaca", "Yucatán", "Aguascalientes", "Nuevo León",
+  "Jalisco", "San Luis Potosí", "Campeche", "Michoacán", "Guanajuato",
+  "Quintana Roo", "Tabasco", "Coahuila", "Guerrero",
+].map((name, order) => ({ id: name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, "_"), name, order }));
+
 // ── Seed runner ────────────────────────────────────────────────────────────
 
 async function seed() {
@@ -488,6 +538,10 @@ async function seed() {
   console.log("Seeding Firestore...");
 
   await Promise.all([
+    batch(stages,      "catalog/stages/items"),
+    batch(groupMeta,   "catalog/groupMeta/items"),
+    batch(docTypes,    "catalog/docTypes/items"),
+    batch(estadosList, "catalog/estados/items"),
     batch(hubs,        "catalog/hubs/items"),
     batch(quioscos.map((q, i) => ({ id: `quiosco-${String(i).padStart(3, "0")}`, ...q })), "catalog/quioscos/items"),
     Promise.all(puestos.map((p, i) => db.collection("catalog/positions/items").doc(`pos-${String(i).padStart(3, "0")}`).set({ name: p, order: i }))),

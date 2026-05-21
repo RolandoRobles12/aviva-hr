@@ -1,8 +1,6 @@
-import { Bell, Search, Help } from "@/components/icons";
+import { Bell, Search, Help, LogOut } from "@/components/icons";
 import { Avatar } from "@/components/ui/Avatar";
-import { users } from "@/data/mock";
-
-const currentUser = users[1]; // Paula Acevedo
+import { useAuth } from "@/context/AuthContext";
 
 interface TopBarProps {
   title: string;
@@ -10,6 +8,15 @@ interface TopBarProps {
 }
 
 export function TopBar({ title, crumb }: TopBarProps) {
+  const { appUser, firebaseUser, signOut } = useAuth();
+
+  const displayName = appUser?.first ?? firebaseUser?.displayName?.split(" ")[0] ?? "Usuario";
+  const avatarUser  = appUser ?? {
+    avatar:   { initials: (firebaseUser?.email?.[0] ?? "U").toUpperCase(), color: "c1" },
+    fullName: firebaseUser?.displayName ?? firebaseUser?.email ?? "Usuario",
+    first:    displayName,
+  };
+
   return (
     <header className="flex items-center gap-3 px-5 h-14 border-b border-[var(--color-line)] bg-[var(--color-surface)] shrink-0">
       {/* Breadcrumb + title */}
@@ -20,9 +27,7 @@ export function TopBar({ title, crumb }: TopBarProps) {
             <span className="text-[var(--color-line-strong)]">/</span>
           </>
         )}
-        <span className="font-semibold text-[var(--color-ink)] truncate">
-          {title}
-        </span>
+        <span className="font-semibold text-[var(--color-ink)] truncate">{title}</span>
       </div>
 
       {/* Search */}
@@ -47,10 +52,15 @@ export function TopBar({ title, crumb }: TopBarProps) {
           <Help size={16} />
         </button>
         <button className="ml-1 flex items-center gap-2 px-2 py-1 rounded-md hover:bg-[var(--color-surface-2)] transition-colors">
-          <Avatar user={currentUser} size="sm" />
-          <span className="text-[12.5px] font-medium text-[var(--color-ink-2)]">
-            {currentUser.first}
-          </span>
+          <Avatar user={avatarUser} size="sm" />
+          <span className="text-[12.5px] font-medium text-[var(--color-ink-2)]">{displayName}</span>
+        </button>
+        <button
+          onClick={signOut}
+          title="Cerrar sesión"
+          className="p-2 rounded-md text-[var(--color-ink-3)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)] transition-colors"
+        >
+          <LogOut size={15} />
         </button>
       </div>
     </header>

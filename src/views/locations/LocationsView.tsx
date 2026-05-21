@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Drawer } from "@/components/ui/Drawer";
 import { Search, Plus, ChevronRight } from "@/components/icons";
 import { cn } from "@/lib/cn";
-import { estados } from "@/data/mock";
+import { useCatalog } from "@/context/CatalogContext";
 
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
   open:   { label: "Abierto",         color: "#026149", bg: "#e7f8ef" },
@@ -78,6 +78,7 @@ function LocationDetail({ loc, onClose }: { loc: Location & { id: string }; onCl
 }
 
 export function LocationsView() {
+  const { estados } = useCatalog();
   const { data: locations, loading, error } = useLocations();
   const [query, setQuery]     = useState("");
   const [estadoF, setEstadoF] = useState("all");

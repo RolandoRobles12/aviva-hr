@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useCandidates } from "@/hooks/useCandidates";
 import { approveExpediente, rejectExpediente } from "@/services/candidates";
-import { DOC_TYPES, stageMeta } from "@/data/mock";
+import { useCatalog } from "@/context/CatalogContext";
 import type { Candidate } from "@/data/types";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
@@ -20,15 +20,16 @@ function DocStatusIcon({ status }: { status: string }) {
   return <div className="size-3.5 rounded-full border-2 border-[var(--color-line)] shrink-0" />;
 }
 
-function docCompletion(docs: Candidate["docs"]): number {
-  const required = DOC_TYPES.filter((d) => d.required);
-  const ok = docs.filter((d) => d.status === "ok");
-  return required.length > 0 ? Math.round((ok.length / required.length) * 100) : 0;
+function docCompletion(docs: Candidate["docs"], requiredCount: number): number {
+  const ok = docs.filter((d) => d.status === "ok").length;
+  return requiredCount > 0 ? Math.round((ok / requiredCount) * 100) : 0;
 }
 
 function ExpedienteDetail({ candidate, onClose }: { candidate: Candidate & { id: string }; onClose: () => void }) {
+  const { docTypes } = useCatalog();
   const [loading, setLoading] = useState(false);
-  const pct = docCompletion(candidate.docs);
+  const requiredCount = docTypes.filter((d) => d.required).length;
+  const pct = docCompletion(candidate.docs, requiredCount);
 
   async function handleApprove() {
     setLoading(true);
@@ -47,7 +48,6 @@ function ExpedienteDetail({ candidate, onClose }: { candidate: Candidate & { id:
   return (
     <Drawer open onClose={onClose} title={candidate.fullName} subtitle={`${candidate.position} · ${candidate.quiosco}`}>
       <div className="px-6 py-5 space-y-5">
-        {/* Completion */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <span className="text-[13px] font-medium text-[var(--color-ink-2)]">Completado</span>
@@ -58,9 +58,8 @@ function ExpedienteDetail({ candidate, onClose }: { candidate: Candidate & { id:
           </div>
         </div>
 
-        {/* Documents list */}
         <div className="space-y-1.5">
-          {DOC_TYPES.map((dt) => {
+          {docTypes.map((dt) => {
             const entry  = candidate.docs.find((d) => d.id === dt.id);
             const status = entry?.status ?? "pending";
             return (
@@ -79,14 +78,9 @@ function ExpedienteDetail({ candidate, onClose }: { candidate: Candidate & { id:
           })}
         </div>
 
-        {/* Actions */}
         <div className="flex gap-2 pt-2">
-          <Button variant="primary" onClick={handleApprove} className="flex-1" disabled={loading}>
-            Aprobar expediente
-          </Button>
-          <Button variant="danger" onClick={handleReject} disabled={loading}>
-            Rechazar
-          </Button>
+          <Button variant="primary" onClick={handleApprove} className="flex-1" disabled={loading}>Aprobar expediente</Button>
+          <Button variant="danger" onClick={handleReject} disabled={loading}>Rechazar</Button>
         </div>
       </div>
     </Drawer>
@@ -95,8 +89,12 @@ function ExpedienteDetail({ candidate, onClose }: { candidate: Candidate & { id:
 
 export function ExpedientesView() {
   const { data: candidates, loading, error } = useCandidates();
+  const { docTypes, stageMeta } = useCatalog();
   const [filter, setFilter] = useState("all");
   const [selected, setSelected] = useState<(Candidate & { id: string }) | null>(null);
+
+  const requiredCount = docTypes.filter((d) => d.required).length;
+  const completion = (c: Candidate) => docCompletion(c.docs, requiredCount);
 
   const inDocs = useMemo(
     () => candidates.filter((c) => DOC_STAGES.includes(c.stage)),
@@ -105,24 +103,23 @@ export function ExpedientesView() {
 
   const filtered = useMemo(() => {
     if (filter === "needs_review") return inDocs.filter((c) => c.docs.some((d) => d.status === "review"));
-    if (filter === "complete")     return inDocs.filter((c) => docCompletion(c.docs) >= 100);
-    if (filter === "incomplete")   return inDocs.filter((c) => docCompletion(c.docs) < 100);
+    if (filter === "complete")     return inDocs.filter((c) => completion(c) >= 100);
+    if (filter === "incomplete")   return inDocs.filter((c) => completion(c) < 100);
     return inDocs;
-  }, [inDocs, filter]);
+  }, [inDocs, filter, requiredCount]);
 
   const stats = useMemo(() => ({
-    total:      inDocs.length,
-    needsReview:inDocs.filter((c) => c.docs.some((d) => d.status === "review")).length,
-    complete:   inDocs.filter((c) => docCompletion(c.docs) >= 100).length,
-    pending:    inDocs.reduce((s, c) => s + DOC_TYPES.filter((d) => d.required && !c.docs.find((x) => x.id === d.id && x.status === "ok")).length, 0),
-  }), [inDocs]);
+    total:       inDocs.length,
+    needsReview: inDocs.filter((c) => c.docs.some((d) => d.status === "review")).length,
+    complete:    inDocs.filter((c) => completion(c) >= 100).length,
+    pending:     inDocs.reduce((s, c) => s + docTypes.filter((d) => d.required && !c.docs.find((x) => x.id === d.id && x.status === "ok")).length, 0),
+  }), [inDocs, requiredCount]);
 
   if (loading) return <LoadingView />;
   if (error)   return <ErrorView message={error.message} />;
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
       <div className="px-5 py-4 border-b border-[var(--color-line)] bg-[var(--color-surface)] shrink-0">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -132,13 +129,12 @@ export function ExpedientesView() {
           <Button variant="secondary" size="sm" icon={<Download size={13} />}>Exportar a Drive</Button>
         </div>
 
-        {/* KPIs */}
         <div className="grid grid-cols-4 gap-3 mb-4">
           {[
-            { label: "Expedientes activos", value: stats.total,       accent: "var(--color-green-700)" },
-            { label: "Requieren revisión",  value: stats.needsReview, accent: "var(--color-danger-fg)" },
-            { label: "Completos al 100%",   value: stats.complete,    accent: "var(--color-green-500)" },
-            { label: "Documentos pendientes", value: stats.pending,   accent: "var(--color-warn-fg)" },
+            { label: "Expedientes activos",    value: stats.total,       accent: "var(--color-green-700)" },
+            { label: "Requieren revisión",     value: stats.needsReview, accent: "var(--color-danger-fg)" },
+            { label: "Completos al 100%",      value: stats.complete,    accent: "var(--color-green-500)" },
+            { label: "Documentos pendientes",  value: stats.pending,     accent: "var(--color-warn-fg)" },
           ].map((k) => (
             <div key={k.label} className="rounded-[var(--radius)] bg-[var(--color-surface-2)] border border-[var(--color-line)] px-4 py-3">
               <div className="text-[11px] text-[var(--color-ink-4)] mb-1">{k.label}</div>
@@ -147,7 +143,6 @@ export function ExpedientesView() {
           ))}
         </div>
 
-        {/* Filter tabs */}
         <div className="flex gap-1">
           {[
             { id: "all",          label: "Todos",              count: stats.total },
@@ -168,7 +163,6 @@ export function ExpedientesView() {
         </div>
       </div>
 
-      {/* Table */}
       <div className="flex-1 overflow-auto">
         <table className="w-full min-w-[700px] border-collapse text-[13px]">
           <thead className="sticky top-0 z-10">
@@ -181,7 +175,7 @@ export function ExpedientesView() {
           <tbody>
             {filtered.map((c) => {
               const stage   = stageMeta(c.stage);
-              const pct     = docCompletion(c.docs);
+              const pct     = completion(c);
               const reviews = c.docs.filter((d) => d.status === "review").length;
               return (
                 <tr key={c.id} onClick={() => setSelected(c)} className="border-b border-[var(--color-line)] hover:bg-[var(--color-mint-50)] cursor-pointer transition-colors group">

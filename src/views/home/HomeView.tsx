@@ -2,7 +2,7 @@ import { useCandidates } from "@/hooks/useCandidates";
 import { useUsers } from "@/hooks/useUsers";
 import { useTickets } from "@/hooks/useTickets";
 import { useIntegrations } from "@/hooks/useIntegrations";
-import { stageMeta } from "@/data/mock";
+import { useCatalog } from "@/context/CatalogContext";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { LoadingView } from "@/components/ui/Spinner";
@@ -25,6 +25,7 @@ function KpiCard({ label, value, sub, accent }: KpiCardProps) {
 }
 
 export function HomeView() {
+  const { stageMeta } = useCatalog();
   const { data: users,        loading: lu } = useUsers();
   const { data: candidates,   loading: lc } = useCandidates();
   const { data: tickets,      loading: lt } = useTickets();
