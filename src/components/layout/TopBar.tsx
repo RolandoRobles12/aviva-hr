@@ -1,5 +1,6 @@
-import { Bell, Search, Help, LogOut } from "@/components/icons";
+import { Search, Help, LogOut } from "@/components/icons";
 import { Avatar } from "@/components/ui/Avatar";
+import { NotifBell } from "@/context/NotifContext";
 import { useAuth } from "@/context/AuthContext";
 
 interface TopBarProps {
@@ -44,10 +45,7 @@ export function TopBar({ title, crumb }: TopBarProps) {
 
       {/* Actions */}
       <div className="ml-auto flex items-center gap-1">
-        <button className="p-2 rounded-md text-[var(--color-ink-3)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)] transition-colors relative">
-          <Bell size={16} />
-          <span className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-green-500" />
-        </button>
+        <NotifBell />
         <button className="p-2 rounded-md text-[var(--color-ink-3)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)] transition-colors">
           <Help size={16} />
         </button>

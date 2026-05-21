@@ -7,6 +7,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Drawer } from "@/components/ui/Drawer";
 import { LoadingView, ErrorView } from "@/components/ui/Spinner";
+import { NewTicketChooser } from "./NewTicketChooser";
 import { Plus, ChevronRight, Check } from "@/components/icons";
 import { cn } from "@/lib/cn";
 
@@ -125,8 +126,9 @@ function TicketDetail({
 export function TicketsView() {
   const { data: tickets,  loading: lt, error: et } = useTickets();
   const { data: users,    loading: lu }             = useUsers();
-  const [statusF, setStatusF] = useState<StatusKey>("all");
+  const [statusF,  setStatusF]  = useState<StatusKey>("all");
   const [selected, setSelected] = useState<(Ticket & { id: string }) | null>(null);
+  const [chooser,  setChooser]  = useState(false);
 
   const filtered = useMemo(() => {
     if (statusF === "all") return tickets;
@@ -154,7 +156,7 @@ export function TicketsView() {
           <h1 className="font-serif text-[22px] font-medium text-[var(--color-ink)]">Bajas</h1>
           <p className="text-[12.5px] text-[var(--color-ink-3)]">Tickets de baja, suspensión y transferencia.</p>
         </div>
-        <Button variant="primary" icon={<Plus size={14} />}>Nuevo ticket</Button>
+        <Button variant="primary" icon={<Plus size={14} />} onClick={() => setChooser(true)}>Nuevo ticket</Button>
       </div>
 
       {/* Status tabs */}
@@ -218,6 +220,9 @@ export function TicketsView() {
 
       {selected && (
         <TicketDetail ticket={selected} userName={userName(selected.userId)} onClose={() => setSelected(null)} />
+      )}
+      {chooser && (
+        <NewTicketChooser onClose={() => setChooser(false)} onSelect={() => {}} />
       )}
     </div>
   );
