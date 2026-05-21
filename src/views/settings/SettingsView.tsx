@@ -154,7 +154,11 @@ function SettingsGeneral() {
 
 // ── Notifications ────────────────────────────────────────────────────────────
 interface NotifRule { id: string; label: string; channel: string; slack: boolean; email: boolean }
-interface NotifRulesDoc { slackEnabled: boolean; emailEnabled: boolean; rules: NotifRule[] }
+interface NotifRulesDoc {
+  slackEnabled: boolean; emailEnabled: boolean; rules: NotifRule[];
+  slackWorkspace: string; slackMeta: string;
+  emailAddress: string; emailMeta: string;
+}
 
 function AlertRuleRow({
   rule,
@@ -215,8 +219,8 @@ function SettingsNotifications() {
       }>
         <div className="grid grid-cols-2 gap-3">
           {[
-            { icon: "#", iconColor: "#611f69", iconBg: "#611f6914", name: "Slack", workspace: "aviva-credito.slack.com", meta: "4 canales · 8 eventos suscritos · webhook OK", checked: slackOn, onChange: setSlackOn },
-            { icon: "@", iconColor: "#1b3f8a", iconBg: "#1b3f8a14", name: "Email", workspace: "people@aviva.com",        meta: "HR Business Partners + Managers",             checked: emailOn, onChange: setEmailOn },
+            { icon: "#", iconColor: "#611f69", iconBg: "#611f6914", name: "Slack", workspace: data?.slackWorkspace ?? "—", meta: data?.slackMeta ?? "Sin configurar", checked: slackOn, onChange: setSlackOn },
+            { icon: "@", iconColor: "#1b3f8a", iconBg: "#1b3f8a14", name: "Email", workspace: data?.emailAddress   ?? "—", meta: data?.emailMeta ?? "Sin configurar", checked: emailOn, onChange: setEmailOn },
           ].map((ch) => (
             <div key={ch.name} className="flex items-start gap-3 p-4 rounded-[var(--radius-sm)] border border-[var(--color-line)]">
               <div className="size-10 rounded-lg grid place-items-center font-bold text-[16px] shrink-0" style={{ background: ch.iconBg, color: ch.iconColor }}>{ch.icon}</div>
@@ -246,31 +250,6 @@ function SettingsNotifications() {
         </div>
       </Section>
 
-      <Section title="Vista previa de mensaje Slack" sub="Así verá el equipo una baja recién creada en #people-avisos.">
-        <div className="rounded-[var(--radius-sm)] border border-[#e5e5e0] bg-white p-4 max-w-[520px] text-[13px]">
-          <div className="flex items-start gap-3">
-            <div className="size-9 rounded-[6px] bg-[var(--color-mint-50)] text-green-700 grid place-items-center font-bold text-[13px] shrink-0">av</div>
-            <div>
-              <div className="flex items-center gap-2 mb-1.5">
-                <b className="text-black">Aviva HR</b>
-                <span className="text-[10px] bg-[#e5e5e0] text-[#3a3a3a] px-1 py-px rounded font-semibold">APP</span>
-                <span className="text-[11px] text-[#999]">16:42</span>
-              </div>
-              <div className="pl-3 border-l-[3px] border-[var(--color-danger-fg)]">
-                <div className="font-semibold text-black">🔴 Nueva baja iniciada · TKT-2041</div>
-                <div className="text-[#555] mt-1 leading-relaxed">
-                  <b className="text-black">Andrés Morales</b> · Backend Engineer · Ingeniería<br />
-                  Motivo: cambio voluntario · Última jornada: <b className="text-black">30 may</b>
-                </div>
-                <div className="flex gap-2 mt-2">
-                  <button className="px-3 py-1 text-[12px] font-medium text-white bg-green-600 rounded">Aprobar</button>
-                  <button className="px-3 py-1 text-[12px] font-medium text-[#555] border border-[#ddd] rounded">Ver ticket</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Section>
     </>
   );
 }
@@ -337,10 +316,18 @@ interface RemindersSettings { enabled: boolean; intervalHours: number; maxRemind
 
 function SettingsReminders() {
   const { data } = useDocument<RemindersSettings>("settings", "reminders");
-  const [enabled,       setEnabled]       = useState(data?.enabled       ?? true);
-  const [intervalHours, setIntervalHours] = useState(data?.intervalHours ?? 48);
-  const [maxReminders,  setMaxReminders]  = useState(data?.maxReminders  ?? 3);
+  const [enabled,       setEnabled]       = useState(true);
+  const [intervalHours, setIntervalHours] = useState(48);
+  const [maxReminders,  setMaxReminders]  = useState(3);
   const [saving,        setSaving]        = useState(false);
+
+  useEffect(() => {
+    if (data) {
+      setEnabled(data.enabled ?? true);
+      setIntervalHours(data.intervalHours ?? 48);
+      setMaxReminders(data.maxReminders ?? 3);
+    }
+  }, [data]);
 
   async function save() {
     setSaving(true);
@@ -395,10 +382,18 @@ interface LinkDurationSettings { formDays: number; offerDays: number; contractDa
 
 function SettingsLinkDuration() {
   const { data } = useDocument<LinkDurationSettings>("settings", "linkDuration");
-  const [formDays,     setFormDays]     = useState(data?.formDays     ?? 7);
-  const [offerDays,    setOfferDays]    = useState(data?.offerDays    ?? 5);
-  const [contractDays, setContractDays] = useState(data?.contractDays ?? 3);
+  const [formDays,     setFormDays]     = useState(7);
+  const [offerDays,    setOfferDays]    = useState(5);
+  const [contractDays, setContractDays] = useState(3);
   const [saving,       setSaving]       = useState(false);
+
+  useEffect(() => {
+    if (data) {
+      setFormDays(data.formDays ?? 7);
+      setOfferDays(data.offerDays ?? 5);
+      setContractDays(data.contractDays ?? 3);
+    }
+  }, [data]);
 
   async function save() {
     setSaving(true);
@@ -460,22 +455,16 @@ function SettingsBranding() {
       <div className="border-t border-[var(--color-line)] pt-5">
         <div className="font-semibold text-[13px] text-[var(--color-ink)] mb-3">Paleta de marca</div>
         <div className="flex gap-4">
-          {palette.length > 0
-            ? palette.map(({ color, label }) => (
-                <div key={color} className="flex flex-col items-center gap-1.5">
-                  <div className="size-14 rounded-xl border border-[var(--color-line)]" style={{ background: color }} />
-                  <div className="text-[12px] font-medium text-[var(--color-ink)]">{label}</div>
-                  <code className="text-[11px] text-[var(--color-ink-4)]">{color}</code>
-                </div>
-              ))
-            : [["#b0f5cd", "Mint"], ["#16b877", "Verde"], ["#026149", "Verde profundo"], ["#FFFFFF", "Blanco"]].map(([color, label]) => (
-                <div key={color} className="flex flex-col items-center gap-1.5">
-                  <div className="size-14 rounded-xl border border-[var(--color-line)]" style={{ background: color }} />
-                  <div className="text-[12px] font-medium text-[var(--color-ink)]">{label}</div>
-                  <code className="text-[11px] text-[var(--color-ink-4)]">{color}</code>
-                </div>
-              ))
-          }
+          {palette.length === 0 && (
+            <div className="text-[13px] text-[var(--color-ink-4)]">Cargando paleta…</div>
+          )}
+          {palette.map(({ color, label }) => (
+            <div key={color} className="flex flex-col items-center gap-1.5">
+              <div className="size-14 rounded-xl border border-[var(--color-line)]" style={{ background: color }} />
+              <div className="text-[12px] font-medium text-[var(--color-ink)]">{label}</div>
+              <code className="text-[11px] text-[var(--color-ink-4)]">{color}</code>
+            </div>
+          ))}
         </div>
       </div>
     </Section>
@@ -694,23 +683,49 @@ function SettingsApprovals() {
 }
 
 // ── Retention ─────────────────────────────────────────────────────────────────
+interface RetentionPolicy { key: string; value: string }
+interface RetentionDoc { policies: RetentionPolicy[] }
+
 function SettingsRetention() {
+  const { data } = useDocument<RetentionDoc>("settings", "retention");
+  const [policies, setPolicies] = useState<RetentionPolicy[]>([]);
+  const [saving,   setSaving]   = useState(false);
+
+  useEffect(() => {
+    if (data?.policies) setPolicies(data.policies);
+  }, [data]);
+
+  function setPolicy(index: number, value: string) {
+    setPolicies((prev) => prev.map((p, i) => i === index ? { ...p, value } : p));
+  }
+
+  async function save() {
+    setSaving(true);
+    try { await updateDocById("settings", "retention", { policies }); }
+    finally { setSaving(false); }
+  }
+
   return (
     <Section title="Retención de datos" sub="Cuánto tiempo se conservan los datos tras una baja.">
-      <div className="grid grid-cols-[1fr_auto] gap-y-4 gap-x-8">
-        {[
-          ["Perfil archivado",                        "90 días tras la última jornada"],
-          ["Documentos legales (contrato, finiquito)", "10 años (obligación legal)"],
-          ["Log de auditoría",                         "5 años"],
-          ["Backups cifrados",                         "30 días"],
-          ["Cuenta SSO / email",                       "Desactivada el día de baja · borrada a los 30 días"],
-        ].map(([key, val]) => (
-          <div key={key} className="contents">
-            <div className="text-[13.5px] font-medium text-[var(--color-ink)]">{key}</div>
-            <div className="text-[13px] text-[var(--color-ink-3)] text-right">{val}</div>
+      {policies.length === 0 ? (
+        <div className="py-6 text-center text-[13px] text-[var(--color-ink-4)]">Cargando políticas…</div>
+      ) : (
+        <div className="space-y-3">
+          {policies.map((p, i) => (
+            <div key={p.key} className="flex items-center gap-4">
+              <div className="flex-1 text-[13.5px] font-medium text-[var(--color-ink)]">{p.key}</div>
+              <input
+                value={p.value}
+                onChange={(e) => setPolicy(i, e.target.value)}
+                className="w-72 h-8 px-3 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)] text-[13px] outline-none text-right"
+              />
+            </div>
+          ))}
+          <div className="pt-2">
+            <Button variant="primary" onClick={save} disabled={saving}>{saving ? "Guardando…" : "Guardar"}</Button>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
     </Section>
   );
 }

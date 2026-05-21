@@ -555,13 +555,27 @@ async function seed() {
     { evt: "Suspensión inmediata",  chain: ["HR Business Partner", "Legal"] },
     { evt: "Acceso a app sensible", chain: ["Manager directo", "IT / Sistemas"] },
   ]};
-  const notifRulesData = { slackEnabled: true, emailEnabled: true, rules: [
-    { id: "offboard.created",   label: "Baja iniciada",             channel: "#people-avisos", slack: true,  email: true  },
-    { id: "offboard.approved",  label: "Baja aprobada",             channel: "#people-avisos", slack: true,  email: false },
-    { id: "offboard.completed", label: "Baja ejecutada",            channel: "#people-bajas",  slack: true,  email: true  },
-    { id: "offboard.failed",    label: "Tarea de baja fallida",     channel: "#it-alertas",    slack: true,  email: true  },
-    { id: "onboard.created",    label: "Alta creada",               channel: "#people-altas",  slack: true,  email: false },
-    { id: "access.granted",     label: "Acceso fuera de plantilla", channel: "#it-alertas",    slack: true,  email: true  },
+  const notifRulesData = {
+    slackEnabled: true, emailEnabled: true,
+    slackWorkspace: "aviva-credito.slack.com",
+    slackMeta: "4 canales · 8 eventos suscritos · webhook OK",
+    emailAddress: "people@avivacredito.com",
+    emailMeta: "HR Business Partners + Managers",
+    rules: [
+      { id: "offboard.created",   label: "Baja iniciada",             channel: "#people-avisos", slack: true,  email: true  },
+      { id: "offboard.approved",  label: "Baja aprobada",             channel: "#people-avisos", slack: true,  email: false },
+      { id: "offboard.completed", label: "Baja ejecutada",            channel: "#people-bajas",  slack: true,  email: true  },
+      { id: "offboard.failed",    label: "Tarea de baja fallida",     channel: "#it-alertas",    slack: true,  email: true  },
+      { id: "onboard.created",    label: "Alta creada",               channel: "#people-altas",  slack: true,  email: false },
+      { id: "access.granted",     label: "Acceso fuera de plantilla", channel: "#it-alertas",    slack: true,  email: true  },
+    ],
+  };
+  const retentionData = { policies: [
+    { key: "Perfil archivado",                        value: "90 días tras la última jornada" },
+    { key: "Documentos legales (contrato, finiquito)", value: "10 años (obligación legal)" },
+    { key: "Log de auditoría",                         value: "5 años" },
+    { key: "Backups cifrados",                         value: "30 días" },
+    { key: "Cuenta SSO / email",                       value: "Desactivada el día de baja · borrada a los 30 días" },
   ]};
 
   const rolesData = [
@@ -612,6 +626,7 @@ async function seed() {
     db.collection("settings").doc("branding").set(brandingData),
     db.collection("settings").doc("approvals").set(approvalsData),
     db.collection("settings").doc("notifRules").set(notifRulesData),
+    db.collection("settings").doc("retention").set(retentionData),
     batch(rolesData,    "roles"),
     batch(apiKeysData,  "apiKeys"),
     batch(webhooksData, "webhooks"),
