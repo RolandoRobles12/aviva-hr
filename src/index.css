@@ -1,0 +1,132 @@
+@import "tailwindcss";
+
+/* ── Dark mode via data-theme attribute ─────────────────────────────────── */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ── Design tokens ──────────────────────────────────────────────────────── */
+@theme {
+  /* Brand palette */
+  --color-mint-50: #f1fdf6;
+  --color-mint-100: #b0f5cd;
+  --color-mint-200: #8aeab9;
+  --color-green-500: #16b877;
+  --color-green-600: #119a64;
+  --color-green-700: #026149;
+  --color-green-900: #022e22;
+
+  /* Semantic – light mode defaults (overridden in [data-theme="dark"]) */
+  --color-bg: #f7f7f4;
+  --color-surface: #ffffff;
+  --color-surface-2: #fbfbf8;
+  --color-line: #e7e7e1;
+  --color-line-strong: #d4d4cc;
+  --color-ink: #131613;
+  --color-ink-2: #353a36;
+  --color-ink-3: #6b716b;
+  --color-ink-4: #9aa099;
+
+  /* Status colours */
+  --color-warn-bg: #fff3d6;
+  --color-warn-fg: #8a5a00;
+  --color-danger-bg: #ffe2dc;
+  --color-danger-fg: #a8200d;
+  --color-info-bg: #e3eeff;
+  --color-info-fg: #1b3f8a;
+  --color-success-bg: #e7f8ef;
+  --color-success-fg: #026149;
+
+  /* Typography */
+  --font-sans: "Inter Tight", "Inter", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-serif: "Fraunces", "Times New Roman", serif;
+
+  /* Border radius */
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 0 rgba(2, 46, 34, 0.04), 0 1px 2px rgba(2, 46, 34, 0.06);
+  --shadow-md: 0 4px 14px -8px rgba(2, 46, 34, 0.18),
+    0 2px 4px rgba(2, 46, 34, 0.06);
+  --shadow-lg: 0 30px 60px -30px rgba(2, 46, 34, 0.35),
+    0 10px 24px -16px rgba(2, 46, 34, 0.18);
+
+  /* Spacing */
+  --spacing-row: 48px;
+}
+
+/* ── Dark mode overrides ────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --color-bg: #0d1411;
+  --color-surface: #121a16;
+  --color-surface-2: #0f1714;
+  --color-line: #1f2a25;
+  --color-line-strong: #2c3a33;
+  --color-ink: #eef3ef;
+  --color-ink-2: #c5cec8;
+  --color-ink-3: #8a948e;
+  --color-ink-4: #5f6862;
+  --color-mint-50: #0f2218;
+  --color-mint-100: #133a26;
+  --shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 14px -8px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 30px 60px -30px rgba(0, 0, 0, 0.8);
+}
+
+/* ── Base ───────────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv11", "ss01", "ss03";
+  letter-spacing: -0.005em;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+::selection {
+  background: var(--color-mint-100);
+  color: var(--color-green-700);
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-4);
+}
