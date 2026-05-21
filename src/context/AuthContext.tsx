@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import {
   onAuthStateChanged,
-  signInWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
   signOut as firebaseSignOut,
   type User as FirebaseUser,
 } from "firebase/auth";
@@ -13,11 +14,12 @@ interface AuthState {
   firebaseUser: FirebaseUser | null;
   appUser: (User & { id: string }) | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
+const googleProvider = new GoogleAuthProvider();
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
@@ -46,7 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       firebaseUser,
       appUser,
       loading,
-      signIn: (email, password) => signInWithEmailAndPassword(auth, email, password).then(),
+      signInWithGoogle: () => signInWithPopup(auth, googleProvider).then(),
       signOut: () => firebaseSignOut(auth),
     }}>
       {children}
