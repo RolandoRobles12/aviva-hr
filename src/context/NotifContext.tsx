@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef } from "react";
 import { Bell, Close } from "@/components/icons";
 import { cn } from "@/lib/cn";
+import { useCollection, createDoc, updateDocById, orderBy } from "@/hooks/useFirestore";
 
 type NotifKind = "offboard" | "onboard" | "alert" | "approval" | "sync" | "info";
 
@@ -71,23 +72,24 @@ function ToastStack({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: st
 }
 
 export function NotifProvider({ children }: { children: React.ReactNode }) {
-  const [items, setItems] = useState<NotifItem[]>([
-    { id: "n1", kind: "offboard", unread: true,  title: "Nueva baja · Andrés Morales",      body: "Ticket TKT-2041 creado. Notificado en #people-avisos.", when: "hace 4 h" },
-    { id: "n2", kind: "alert",    unread: true,  title: "Tarea fallida en HubSpot",          body: "TKT-2041: reasignación de 14 contactos · Conflict.",   when: "hace 2 h" },
-    { id: "n3", kind: "approval", unread: false, title: "Aprobación pendiente · IT",         body: "Mateo García debe revisar TKT-2041.",                  when: "hace 1 h" },
-    { id: "n4", kind: "sync",     unread: false, title: "Sincronización con Google completada", body: "144 cuentas verificadas, 0 inconsistencias.",      when: "hace 12 min" },
-  ]);
+  const { data: firestoreItems } = useCollection<NotifItem & { createdAt: unknown }>(
+    "notifications",
+    [orderBy("createdAt", "desc")]
+  );
+  const items: NotifItem[] = firestoreItems;
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   function notify({ title, body, kind = "info" as NotifKind }: { title: string; body?: string; kind?: NotifKind }) {
     const id = "t" + Date.now() + Math.random().toString(36).slice(2, 6);
     setToasts((t) => [...t, { id, title, body, kind }]);
-    setItems((it) => [{ id: "n" + id, kind, unread: true, title, body, when: "ahora mismo" }, ...it]);
+    createDoc("notifications", { kind, unread: true, title, body, when: "ahora mismo" });
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 5200);
   }
 
   function markAllRead() {
-    setItems((items) => items.map((x) => ({ ...x, unread: false })));
+    Promise.all(
+      items.filter((x) => x.unread).map((x) => updateDocById("notifications", x.id, { unread: false }))
+    );
   }
 
   return (

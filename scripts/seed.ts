@@ -537,6 +537,54 @@ async function seed() {
 
   console.log("Seeding Firestore...");
 
+  // ── Additional settings data ──────────────────────────────────────────────
+  const workspaceData    = { name: "Aviva Crédito", domain: "@avivacredito.com", timezone: "America/Mexico_City (GMT−6)" };
+  const gmailData        = { connected: true, email: "people@avivacredito.com", sentCount: 312, deliveryRate: 98.7, bounces: 4 };
+  const remindersData    = { enabled: true, intervalHours: 48, maxReminders: 3 };
+  const linkDurationData = { formDays: 7, offerDays: 5, contractDays: 3 };
+  const brandingData     = { palette: [
+    { color: "#b0f5cd", label: "Mint" },
+    { color: "#16b877", label: "Verde" },
+    { color: "#026149", label: "Verde profundo" },
+    { color: "#FFFFFF",  label: "Blanco" },
+  ]};
+  const approvalsData = { chains: [
+    { evt: "Alta de persona",       chain: ["HR Business Partner"] },
+    { evt: "Baja por renuncia",     chain: ["Manager directo", "HR Business Partner", "IT / Sistemas"] },
+    { evt: "Baja por despido",      chain: ["HR Business Partner", "Legal", "IT / Sistemas"] },
+    { evt: "Suspensión inmediata",  chain: ["HR Business Partner", "Legal"] },
+    { evt: "Acceso a app sensible", chain: ["Manager directo", "IT / Sistemas"] },
+  ]};
+  const notifRulesData = { slackEnabled: true, emailEnabled: true, rules: [
+    { id: "offboard.created",   label: "Baja iniciada",             channel: "#people-avisos", slack: true,  email: true  },
+    { id: "offboard.approved",  label: "Baja aprobada",             channel: "#people-avisos", slack: true,  email: false },
+    { id: "offboard.completed", label: "Baja ejecutada",            channel: "#people-bajas",  slack: true,  email: true  },
+    { id: "offboard.failed",    label: "Tarea de baja fallida",     channel: "#it-alertas",    slack: true,  email: true  },
+    { id: "onboard.created",    label: "Alta creada",               channel: "#people-altas",  slack: true,  email: false },
+    { id: "access.granted",     label: "Acceso fuera de plantilla", channel: "#it-alertas",    slack: true,  email: true  },
+  ]};
+
+  const rolesData = [
+    { id: "r-hr",    name: "HR Business Partner", desc: "Gestión completa de personas",        color: "#16b877", members: 3 },
+    { id: "r-it",    name: "IT / Sistemas",         desc: "Acceso a apps y equipamiento",        color: "#1b3f8a", members: 2 },
+    { id: "r-mgr",   name: "Manager",               desc: "Revisión y aprobación de su equipo",  color: "#5c2e8e", members: 8 },
+    { id: "r-admin", name: "Administrador",          desc: "Acceso total",                        color: "#026149", members: 1 },
+  ];
+
+  const apiKeysData = [
+    { id: "k1", name: "Producción · Backend",  prefix: "ak_live_w7F2", scopes: ["users:read","users:write","tickets:read"], lastUsed: "hace 4 min", status: "ok",    author: "Amran Frey"   },
+    { id: "k2", name: "Staging · Backend",     prefix: "ak_test_2qD9", scopes: ["users:read","users:write"],                lastUsed: "hace 1 h",   status: "ok",    author: "Amran Frey"   },
+    { id: "k3", name: "BI · Lectura",          prefix: "ak_live_bM4r", scopes: ["users:read","audit:read"],                 lastUsed: "hace 2 d",   status: "ok",    author: "Sofía Ramírez" },
+    { id: "k4", name: "HubSpot Sync",          prefix: "ak_live_h0p1", scopes: ["users:read","users:write","events:write"],  lastUsed: "hace 1 min", status: "ok",    author: "Andrés Arías"  },
+    { id: "k5", name: "Webhooks Slack viejo",  prefix: "ak_live_old3", scopes: ["events:write"],                             lastUsed: "hace 47 d",  status: "stale", author: "Paula Acevedo" },
+  ];
+
+  const webhooksData = [
+    { id: "wh1", url: "https://api.aviva.com/hr/people-events",  events: ["onboard.*","offboard.*"],                status: "ok",   last: "hace 2 min · 200" },
+    { id: "wh2", url: "https://hooks.hubspot.com/aviva-people",  events: ["users.created","users.updated"],         status: "ok",   last: "hace 8 min · 200" },
+    { id: "wh3", url: "https://internal.aviva.com/audit-stream", events: ["*"],                                     status: "warn", last: "hace 14 min · 503" },
+  ];
+
   await Promise.all([
     batch(stages,      "catalog/stages/items"),
     batch(groupMeta,   "catalog/groupMeta/items"),
@@ -557,6 +605,16 @@ async function seed() {
     batch(catalogProducts,   "catalog/products/items"),
     batch(catalogPositions,  "catalog/positions/items"),
     db.collection("settings").doc("app").set(appSettings),
+    db.collection("settings").doc("workspace").set(workspaceData),
+    db.collection("settings").doc("gmail").set(gmailData),
+    db.collection("settings").doc("reminders").set(remindersData),
+    db.collection("settings").doc("linkDuration").set(linkDurationData),
+    db.collection("settings").doc("branding").set(brandingData),
+    db.collection("settings").doc("approvals").set(approvalsData),
+    db.collection("settings").doc("notifRules").set(notifRulesData),
+    batch(rolesData,    "roles"),
+    batch(apiKeysData,  "apiKeys"),
+    batch(webhooksData, "webhooks"),
   ]);
 
   console.log("Done. All collections seeded.");
