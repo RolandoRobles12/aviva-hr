@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUsers } from "@/hooks/useUsers";
 import { useIntegrations } from "@/hooks/useIntegrations";
-import { updateUser } from "@/services/users";
+import { updateUser, createUser } from "@/services/users";
 import { useCatalog } from "@/context/CatalogContext";
 import { useNotif } from "@/context/NotifContext";
 import type { User } from "@/data/types";
@@ -14,9 +14,142 @@ import { LoadingView, ErrorView } from "@/components/ui/Spinner";
 import { ImportWizard } from "./ImportWizard";
 import {
   Search, UserPlus, ChevronRight, Download, Upload,
-  TableIcon, GridIcon, ArrowUpDown,
+  TableIcon, GridIcon, ArrowUpDown, Close,
 } from "@/components/icons";
 import { cn } from "@/lib/cn";
+
+// ── New User Modal ─────────────────────────────────────────────────────────────
+function NewUserModal({ onClose }: { onClose: () => void }) {
+  const { hubs, estados } = useCatalog();
+  const { notify } = useNotif();
+  const [saving, setSaving] = useState(false);
+
+  const [numColaborador, setNumColaborador] = useState("");
+  const [first, setFirst]     = useState("");
+  const [last,  setLast]      = useState("");
+  const [email, setEmail]     = useState("");
+  const [role,  setRole]      = useState("");
+  const [hub,   setHub]       = useState("");
+  const [quiosco, setQuiosco] = useState("");
+  const [estado,  setEstado]  = useState("");
+  const [empresa, setEmpresa] = useState("Aviva Crédito");
+  const [genero,  setGenero]  = useState<"H" | "M">("H");
+  const [talla,   setTalla]   = useState("M");
+  const [phone,   setPhone]   = useState("");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await createUser({
+        numColaborador, first, last,
+        fullName: `${first} ${last}`,
+        email, role, hub, quiosco, estado, empresa,
+        genero, talla, phone,
+        manager: null, managerName: null,
+        avatar: {
+          initials: (first[0] ?? "?").toUpperCase() + (last[0] ?? "").toUpperCase(),
+          color: "c1",
+        },
+        hiredAt: new Date().toISOString().slice(0, 10),
+        hireMonths: 0,
+        status: "invited",
+        laptop: null, tablets: [], access: [],
+        hubspot: null,
+        id: "",
+      });
+      notify({ title: "Alta creada", body: `${first} ${last} · Invitación pendiente.`, kind: "onboard" });
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const inputClass = "h-9 w-full px-3 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)] text-[13px] outline-none";
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[520px] max-h-[90vh] overflow-y-auto rounded-[var(--radius-lg)] bg-[var(--color-surface)] shadow-[var(--shadow-lg)] p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-[15px] text-[var(--color-ink)]">Nueva alta de colaborador</h2>
+          <button onClick={onClose} className="p-1 rounded-md text-[var(--color-ink-3)] hover:bg-[var(--color-surface-2)] transition-colors">
+            <Close size={16} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Núm. colaborador *</label>
+              <input className={inputClass} required value={numColaborador} onChange={(e) => setNumColaborador(e.target.value)} placeholder="EMP-001" />
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Email corporativo *</label>
+              <input type="email" className={inputClass} required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nombre@avivacredito.com" />
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Nombre *</label>
+              <input className={inputClass} required value={first} onChange={(e) => setFirst(e.target.value)} placeholder="Juan" />
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Apellidos *</label>
+              <input className={inputClass} required value={last} onChange={(e) => setLast(e.target.value)} placeholder="García López" />
+            </div>
+            <div className="col-span-2">
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Puesto / Role *</label>
+              <input className={inputClass} required value={role} onChange={(e) => setRole(e.target.value)} placeholder="Ej. Promotor de campo" />
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Hub</label>
+              <select className={inputClass} value={hub} onChange={(e) => setHub(e.target.value)}>
+                <option value="">Sin asignar</option>
+                {hubs.map((h) => <option key={h.id} value={h.id}>{h.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Estado</label>
+              <select className={inputClass} value={estado} onChange={(e) => setEstado(e.target.value)}>
+                <option value="">Sin asignar</option>
+                {estados.map((est) => <option key={est} value={est}>{est}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Quiósco</label>
+              <input className={inputClass} value={quiosco} onChange={(e) => setQuiosco(e.target.value)} placeholder="Nombre del quiósco" />
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Empresa</label>
+              <input className={inputClass} value={empresa} onChange={(e) => setEmpresa(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Género</label>
+              <select className={inputClass} value={genero} onChange={(e) => setGenero(e.target.value as "H" | "M")}>
+                <option value="H">H</option>
+                <option value="M">M</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Talla</label>
+              <select className={inputClass} value={talla} onChange={(e) => setTalla(e.target.value)}>
+                {["XS","S","M","L","XL","XXL"].map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Teléfono</label>
+              <input className={inputClass} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+52 55 0000 0000" />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="secondary" size="sm" onClick={onClose}>Cancelar</Button>
+            <Button type="submit" variant="primary" size="sm" disabled={saving}>
+              {saving ? "Guardando…" : "Crear alta"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </>
+  );
+}
 
 const STATUS_TABS = ["all", "active", "invited", "offboarding", "suspended"] as const;
 type StatusTab = (typeof STATUS_TABS)[number];
@@ -223,8 +356,6 @@ function BulkBar({ count, onClear, onOffboard }: { count: number; onClear: () =>
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 px-5 py-3 rounded-full bg-[var(--color-ink)] text-white shadow-[var(--shadow-lg)]">
       <span className="font-bold text-[13px]">{count} seleccionado{count > 1 ? "s" : ""}</span>
       <div className="w-px h-4 bg-white/20" />
-      <button className="text-[12.5px] hover:text-green-300 transition-colors">Asignar equipo</button>
-      <button className="text-[12.5px] hover:text-green-300 transition-colors">Sincronizar</button>
       <button onClick={onOffboard} className="text-[12.5px] text-[var(--color-danger-fg)] hover:opacity-80 transition-opacity">Iniciar baja</button>
       <div className="w-px h-4 bg-white/20" />
       <button onClick={onClear} className="text-[12px] text-white/60 hover:text-white transition-colors">Cancelar</button>
@@ -247,6 +378,7 @@ export function DirectoryView() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [drawer,   setDrawer]   = useState<(User & { id: string }) | null>(null);
   const [importing, setImporting] = useState(false);
+  const [newUserOpen, setNewUserOpen] = useState(false);
 
   function exportCSV() {
     const headers = ["Número","Nombre completo","Email","Puesto","Hub","Quiósco","Estado","Empresa","Estatus","Antigüedad (meses)"];
@@ -351,7 +483,7 @@ export function DirectoryView() {
             </div>
             <Button variant="secondary" size="sm" icon={<Download size={13} />} onClick={exportCSV}>Exportar CSV</Button>
             <Button variant="secondary" size="sm" icon={<Upload size={13} />} onClick={() => setImporting(true)}>Importar</Button>
-            <Button variant="primary"   size="sm" icon={<UserPlus size={14} />} onClick={() => notify({ title: "Alta de persona", body: "Completa el formulario de alta próximamente disponible.", kind: "info" })}>Nueva alta</Button>
+            <Button variant="primary"   size="sm" icon={<UserPlus size={14} />} onClick={() => setNewUserOpen(true)}>Nueva alta</Button>
           </div>
         </div>
 
@@ -484,6 +616,9 @@ export function DirectoryView() {
           onImported={() => setImporting(false)}
         />
       )}
+
+      {/* New user modal */}
+      {newUserOpen && <NewUserModal onClose={() => setNewUserOpen(false)} />}
 
       {/* User detail drawer */}
       {drawer && <UserDetail user={drawer} allUsers={users} onClose={() => setDrawer(null)} />}

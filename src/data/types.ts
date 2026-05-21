@@ -130,7 +130,7 @@ export interface Candidate {
 
 // ── Tickets ───────────────────────────────────────────────────────────────
 
-export type TicketKind = "offboarding" | "import" | "transfer" | "suspend";
+export type TicketKind = "offboarding" | "import" | "transfer" | "suspend" | "access";
 export type TicketStatus = "in_progress" | "approved" | "rejected" | "completed";
 
 export interface Approval {

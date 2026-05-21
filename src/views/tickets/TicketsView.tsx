@@ -2,15 +2,16 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTickets } from "@/hooks/useTickets";
 import { useUsers } from "@/hooks/useUsers";
-import { submitApproval } from "@/services/tickets";
+import { createOffboardingTicket, submitApproval } from "@/services/tickets";
 import { useNotif } from "@/context/NotifContext";
+import { useAuth } from "@/context/AuthContext";
 import type { Ticket } from "@/data/types";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Drawer } from "@/components/ui/Drawer";
 import { LoadingView, ErrorView } from "@/components/ui/Spinner";
 import { NewTicketChooser } from "./NewTicketChooser";
-import { Plus, ChevronRight, Check } from "@/components/icons";
+import { Plus, ChevronRight, Check, Close } from "@/components/icons";
 import { cn } from "@/lib/cn";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -21,6 +22,131 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
 };
 
 type StatusKey = "all" | "in_progress" | "completed";
+
+type TicketFormKind = "offboarding" | "suspend" | "transfer" | "access";
+
+const KIND_LABELS: Record<TicketFormKind, string> = {
+  offboarding: "Baja",
+  suspend:     "Suspensión",
+  transfer:    "Transferencia",
+  access:      "Acceso especial",
+};
+
+const REASONS_BY_KIND: Record<TicketFormKind, string[]> = {
+  offboarding: ["Renuncia voluntaria", "Fin de contrato", "Despido", "Mutuo acuerdo", "Otro"],
+  suspend:     ["Investigación interna", "Permiso sin goce", "Incapacidad médica", "Otro"],
+  transfer:    ["Cambio de hub", "Ascenso", "Reubicación geográfica", "Otro"],
+  access:      ["Proyecto especial", "Cobertura temporal", "Solicitud de manager", "Otro"],
+};
+
+// ── New Ticket Modal ───────────────────────────────────────────────────────────
+function NewTicketModal({
+  kind,
+  onClose,
+}: {
+  kind: TicketFormKind;
+  onClose: () => void;
+}) {
+  const { data: users } = useUsers();
+  const { notify } = useNotif();
+  const { appUser } = useAuth();
+
+  const sorted = useMemo(
+    () => [...users].sort((a, b) => a.fullName.localeCompare(b.fullName)),
+    [users]
+  );
+
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [reason,  setReason]  = useState("");
+  const [lastDay, setLastDay] = useState("");
+  const [saving,  setSaving]  = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const now = new Date().toISOString().slice(0, 10);
+      await createOffboardingTicket({
+        kind,
+        userId: selectedUserId,
+        reason,
+        lastDay: kind === "offboarding" ? lastDay : now,
+        createdAt: now,
+        createdBy: appUser?.fullName ?? "HR",
+        status: "in_progress",
+        progress: 0,
+        approvals: [
+          { role: "Manager directo",     who: "Pendiente", state: "pending" },
+          { role: "HR Business Partner", who: "Pendiente", state: "pending" },
+          ...(kind === "offboarding" || kind === "suspend"
+            ? [{ role: "IT / Sistemas", who: "Pendiente", state: "pending" as const }]
+            : []),
+        ],
+        timeline: [
+          { state: "done",    title: "Ticket creado",           who: appUser?.fullName ?? "HR", when: now },
+          { state: "current", title: "Esperando aprobaciones",  when: "—" },
+          { state: "pending", title: "Ejecución",               when: "—" },
+          { state: "pending", title: "Completado",              when: "—" },
+        ],
+        id: "",
+      });
+      notify({ title: "Ticket creado", body: `Ticket de ${KIND_LABELS[kind]} iniciado correctamente.`, kind: "info" });
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const inputClass = "h-9 w-full px-3 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)] text-[13px] outline-none";
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[520px] rounded-[var(--radius-lg)] bg-[var(--color-surface)] shadow-[var(--shadow-lg)] p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-[15px] text-[var(--color-ink)]">
+            Nuevo ticket · {KIND_LABELS[kind]}
+          </h2>
+          <button onClick={onClose} className="p-1 rounded-md text-[var(--color-ink-3)] hover:bg-[var(--color-surface-2)] transition-colors">
+            <Close size={16} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Colaborador *</label>
+            <select className={inputClass} required value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)}>
+              <option value="">Seleccionar colaborador…</option>
+              {sorted.map((u) => (
+                <option key={u.id} value={u.id}>{u.fullName}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Motivo *</label>
+            <select className={inputClass} required value={reason} onChange={(e) => setReason(e.target.value)}>
+              <option value="">Seleccionar motivo…</option>
+              {REASONS_BY_KIND[kind].map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          </div>
+          {kind === "offboarding" && (
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Última jornada *</label>
+              <input type="date" className={inputClass} required value={lastDay} onChange={(e) => setLastDay(e.target.value)} />
+            </div>
+          )}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="secondary" size="sm" onClick={onClose}>Cancelar</Button>
+            <Button type="submit" variant="primary" size="sm" disabled={saving}>
+              {saving ? "Guardando…" : "Crear ticket"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </>
+  );
+}
 
 function TicketDetail({
   ticket,
@@ -133,10 +259,16 @@ export function TicketsView() {
   const [statusF,  setStatusF]  = useState<StatusKey>("all");
   const [selected, setSelected] = useState<(Ticket & { id: string }) | null>(null);
   const [chooser,  setChooser]  = useState(false);
+  const [ticketKind, setTicketKind] = useState<TicketFormKind | null>(null);
 
   function handleTicketSelect(id: string) {
     setChooser(false);
     if (id === "import") { navigate("/directory"); return; }
+    if (id === "offboard") { setTicketKind("offboarding"); return; }
+    if (id === "suspend" || id === "transfer" || id === "access") {
+      setTicketKind(id as TicketFormKind);
+      return;
+    }
     notify({ title: `Nuevo ticket · ${id}`, body: "El formulario se abrirá en la siguiente versión.", kind: "info" });
   }
 
@@ -233,6 +365,9 @@ export function TicketsView() {
       )}
       {chooser && (
         <NewTicketChooser onClose={() => setChooser(false)} onSelect={handleTicketSelect} />
+      )}
+      {ticketKind && (
+        <NewTicketModal kind={ticketKind} onClose={() => setTicketKind(null)} />
       )}
     </div>
   );
