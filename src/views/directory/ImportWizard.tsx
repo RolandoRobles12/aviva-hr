@@ -2,6 +2,7 @@ import { useState, useMemo, useRef } from "react";
 import { Check, Close, Download, Upload, Warn } from "@/components/icons";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
+import { createDoc } from "@/hooks/useFirestore";
 
 const TARGETS = [
   { id: "numColaborador", label: "Número de colaborador", required: true,  hints: ["No de colaborador", "Número", "ID", "Numero colaborador"] },
@@ -71,6 +72,7 @@ export function ImportWizard({ onClose, onImported }: Props) {
   const [headers, setHeaders]         = useState<string[]>([]);
   const [mapping, setMapping]         = useState<Partial<Record<TargetId, number>>>({});
   const [dragOver, setDragOver]       = useState(false);
+  const [importing, setImporting]     = useState(false);
   const fileInputRef                  = useRef<HTMLInputElement>(null);
 
   function handleFile(f: File) {
@@ -120,10 +122,42 @@ export function ImportWizard({ onClose, onImported }: Props) {
     return { ok, warn, err, rows, total: parsedRows.length };
   }, [parsedRows, mapping]);
 
-  function doImport() {
-    const result = { ok: validation.ok, warn: validation.warn, err: validation.err, total: validation.total };
-    onImported?.(result);
-    setStep(3);
+  async function doImport() {
+    setImporting(true);
+    try {
+      const toImport = validation.rows.filter(r => r.sev !== "err");
+      await Promise.all(
+        toImport.map(row =>
+          createDoc("users", {
+            numColaborador: row.mapped.numColaborador ?? "",
+            fullName:       row.mapped.fullName       ?? "",
+            email:          row.mapped.email          ?? "",
+            role:           row.mapped.role           ?? "",
+            hub:            row.mapped.hub            ?? "",
+            quiosco:        row.mapped.quiosco        ?? "",
+            estado:         row.mapped.estado         ?? "",
+            managerName:    row.mapped.managerName    ?? "",
+            empresa:        row.mapped.empresa        ?? "Aviva Financial",
+            talla:          row.mapped.talla          ?? "M",
+            genero:         row.mapped.genero         ?? "M",
+            hiredAt:        row.mapped.hiredAt        ?? new Date().toISOString().slice(0,10),
+            phone:          row.mapped.phone          ?? "",
+            hubspot:        row.mapped.hubspot        ?? "",
+            status:         "invited",
+            access:         [],
+            tablets:        [],
+            hireMonths:     0,
+            avatar:         { initials: (row.mapped.fullName ?? "?")[0].toUpperCase(), color: "c1" },
+            first:          (row.mapped.fullName ?? "").split(" ")[0],
+            last:           (row.mapped.fullName ?? "").split(" ").slice(1).join(" "),
+          })
+        )
+      );
+      onImported?.({ ok: validation.ok, warn: validation.warn, err: validation.err, total: validation.total });
+      setStep(3);
+    } finally {
+      setImporting(false);
+    }
   }
 
   return (
@@ -362,8 +396,8 @@ export function ImportWizard({ onClose, onImported }: Props) {
             </Button>
           )}
           {step === 2 && (
-            <Button variant="primary" onClick={doImport} disabled={validation.err === validation.total && validation.total > 0}>
-              Importar {validation.ok + validation.warn} colaboradores
+            <Button variant="primary" onClick={doImport} disabled={(validation.err === validation.total && validation.total > 0) || importing}>
+              {importing ? "Importando…" : `Importar ${validation.ok + validation.warn} colaboradores`}
             </Button>
           )}
         </div>
