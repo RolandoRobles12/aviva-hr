@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { useDocument, updateDocById } from "@/hooks/useFirestore";
+import { useState, useEffect } from "react";
+import { useDocument, useCollection, updateDocById, createDoc, deleteDocById, orderBy } from "@/hooks/useFirestore";
+import { useNotif } from "@/context/NotifContext";
 import { Button } from "@/components/ui/Button";
 import {
   Cog, Bell, Mail, History, Shield, User, Link, Check, Plus, Close, Copy, Refresh,
@@ -57,31 +58,53 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 
 // ── General ──────────────────────────────────────────────────────────────────
 function SettingsGeneral() {
-  const { data: settings } = useDocument<{ theme: string; density: string }>("settings", "app");
-  const [theme,   setTheme]   = useState<"light" | "dark">("light");
-  const [density, setDensity] = useState<"comfortable" | "compact">("comfortable");
-  const [saving,  setSaving]  = useState(false);
+  const { data: wsData } = useDocument<{ name: string; domain: string; timezone: string }>("settings", "workspace");
+  const { data: appData } = useDocument<{ theme: string; density: string }>("settings", "app");
+  const [name,     setName]    = useState("");
+  const [timezone, setTimezone] = useState("");
+  const [theme,    setTheme]   = useState<"light" | "dark">("light");
+  const [density,  setDensity] = useState<"comfortable" | "compact">("comfortable");
+  const [saving,   setSaving]  = useState(false);
+
+  useEffect(() => {
+    if (wsData) {
+      setName(wsData.name);
+      setTimezone(wsData.timezone);
+    }
+  }, [wsData]);
+
+  useEffect(() => {
+    if (appData) {
+      setTheme((appData.theme as "light" | "dark") ?? "light");
+      setDensity((appData.density as "comfortable" | "compact") ?? "comfortable");
+    }
+  }, [appData]);
 
   async function save() {
     setSaving(true);
     try {
+      await updateDocById("settings", "workspace", { name, timezone });
       await updateDocById("settings", "app", { theme, density });
       document.documentElement.setAttribute("data-theme", theme);
     } finally { setSaving(false); }
   }
-
-  void settings;
 
   return (
     <>
       <Section title="Workspace" sub="Información básica del workspace.">
         <div className="grid grid-cols-[140px_1fr] gap-y-3 gap-x-4 text-[13px]">
           <span className="text-[var(--color-ink-3)] self-center">Nombre</span>
-          <input defaultValue="Aviva Crédito" className="h-8 px-3 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)] outline-none text-[13px]" />
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="h-8 px-3 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)] outline-none text-[13px]"
+          />
           <span className="text-[var(--color-ink-3)] self-center">Dominio corporativo</span>
-          <span className="font-mono text-[12px] px-2 py-0.5 rounded bg-[var(--color-surface-2)] border border-[var(--color-line)] w-fit">@avivacredito.com</span>
+          <span className="font-mono text-[12px] px-2 py-0.5 rounded bg-[var(--color-surface-2)] border border-[var(--color-line)] w-fit">
+            {wsData?.domain ?? "@avivacredito.com"}
+          </span>
           <span className="text-[var(--color-ink-3)] self-center">Zona horaria</span>
-          <span className="text-[var(--color-ink-2)]">America/Mexico_City (GMT−6)</span>
+          <span className="text-[var(--color-ink-2)]">{timezone || "America/Mexico_City (GMT−6)"}</span>
         </div>
       </Section>
 
@@ -130,47 +153,65 @@ function SettingsGeneral() {
 }
 
 // ── Notifications ────────────────────────────────────────────────────────────
-const ALERT_EVENTS = [
-  { id: "offboard.created",   label: "Baja iniciada",             desc: "Se crea un nuevo ticket de baja.",       channel: "#people-avisos", slack: true,  email: true  },
-  { id: "offboard.approved",  label: "Baja aprobada",             desc: "Las tres aprobaciones están listas.",    channel: "#people-avisos", slack: true,  email: false },
-  { id: "offboard.completed", label: "Baja ejecutada",            desc: "Todas las tareas automáticas terminaron.", channel: "#people-bajas", slack: true,  email: true  },
-  { id: "offboard.failed",    label: "Tarea de baja fallida",     desc: "Una tarea automática falló.",            channel: "#it-alertas",    slack: true,  email: true  },
-  { id: "onboard.created",    label: "Alta creada",               desc: "Se invita a una nueva persona.",         channel: "#people-altas",  slack: true,  email: false },
-  { id: "access.granted",     label: "Acceso fuera de plantilla", desc: "Se da acceso manual a una app sensible.", channel: "#it-alertas",   slack: true,  email: true  },
-];
+interface NotifRule { id: string; label: string; channel: string; slack: boolean; email: boolean }
+interface NotifRulesDoc { slackEnabled: boolean; emailEnabled: boolean; rules: NotifRule[] }
 
-function AlertRuleRow({ evt }: { evt: typeof ALERT_EVENTS[number] }) {
-  const [slack, setSlack] = useState(evt.slack);
-  const [email, setEmail] = useState(evt.email);
+function AlertRuleRow({
+  rule,
+  onToggle,
+}: {
+  rule: NotifRule;
+  onToggle: (field: "slack" | "email", val: boolean) => void;
+}) {
   return (
     <div className="flex items-center gap-4 px-5 py-3.5 border-b border-[var(--color-line)] last:border-0">
       <div className="flex-1">
-        <div className="font-medium text-[13.5px] text-[var(--color-ink)]">{evt.label}</div>
-        <div className="text-[12px] text-[var(--color-ink-3)] mt-0.5">{evt.desc}</div>
+        <div className="font-medium text-[13.5px] text-[var(--color-ink)]">{rule.label}</div>
         <span className="inline-block mt-1.5 text-[11px] font-mono bg-[var(--color-surface-2)] border border-[var(--color-line)] text-[var(--color-ink-3)] px-1.5 py-0.5 rounded">
-          {evt.channel}
+          {rule.channel}
         </span>
       </div>
       <div className="flex flex-col items-center gap-1 w-16">
         <span className="text-[10px] text-[var(--color-ink-4)] uppercase tracking-wide">Slack</span>
-        <Toggle checked={slack} onChange={setSlack} />
+        <Toggle checked={rule.slack} onChange={(v) => onToggle("slack", v)} />
       </div>
       <div className="flex flex-col items-center gap-1 w-16">
         <span className="text-[10px] text-[var(--color-ink-4)] uppercase tracking-wide">Email</span>
-        <Toggle checked={email} onChange={setEmail} />
+        <Toggle checked={rule.email} onChange={(v) => onToggle("email", v)} />
       </div>
     </div>
   );
 }
 
 function SettingsNotifications() {
-  const [slackOn, setSlackOn] = useState(true);
-  const [emailOn, setEmailOn] = useState(true);
+  const { notify } = useNotif();
+  const { data } = useDocument<NotifRulesDoc>("settings", "notifRules");
+  const slackOn = data?.slackEnabled ?? true;
+  const emailOn = data?.emailEnabled ?? true;
+  const rules   = data?.rules ?? [];
+
+  function setSlackOn(v: boolean) {
+    updateDocById("settings", "notifRules", { slackEnabled: v });
+  }
+  function setEmailOn(v: boolean) {
+    updateDocById("settings", "notifRules", { emailEnabled: v });
+  }
+
+  function handleRuleToggle(ruleId: string, field: "slack" | "email", val: boolean) {
+    if (!data?.rules) return;
+    const updated = data.rules.map((r) =>
+      r.id === ruleId ? { ...r, [field]: val } : r
+    );
+    updateDocById("settings", "notifRules", { rules: updated });
+  }
 
   return (
     <>
       <Section title="Canales conectados" sub="Aviva HR envía alertas cuando ocurren eventos de personas." action={
-        <Button size="sm" variant="secondary" icon={<Plus size={13} />}>Conectar canal</Button>
+        <Button size="sm" variant="secondary" icon={<Plus size={13} />}
+          onClick={() => notify({ title: "Próximamente", body: "La integración con Slack/Email requiere configuración del backend.", kind: "info" })}>
+          Conectar canal
+        </Button>
       }>
         <div className="grid grid-cols-2 gap-3">
           {[
@@ -192,7 +233,16 @@ function SettingsNotifications() {
 
       <Section title="Reglas de alertas" sub="Qué eventos disparan una notificación y a qué canal.">
         <div className="-m-5 mt-0">
-          {ALERT_EVENTS.map((evt) => <AlertRuleRow key={evt.id} evt={evt} />)}
+          {rules.map((rule) => (
+            <AlertRuleRow
+              key={rule.id}
+              rule={rule}
+              onToggle={(field, val) => handleRuleToggle(rule.id, field, val)}
+            />
+          ))}
+          {rules.length === 0 && (
+            <div className="px-5 py-8 text-center text-[13px] text-[var(--color-ink-4)]">Cargando reglas…</div>
+          )}
         </div>
       </Section>
 
@@ -229,9 +279,18 @@ function SettingsNotifications() {
 interface GmailSettings { connected: boolean; email: string; sentCount: number; deliveryRate: number; bounces: number }
 
 function SettingsGmail() {
+  const { notify } = useNotif();
   const { data } = useDocument<GmailSettings>("settings", "gmail");
   const connected = data?.connected ?? true;
   const email     = data?.email     ?? "people@avivacredito.com";
+
+  function handleDisconnect() {
+    updateDocById("settings", "gmail", { connected: false, email: "" });
+  }
+
+  function handleOAuth() {
+    notify({ title: "Configuración OAuth", body: "Configura el backend OAuth en Firebase Functions para conectar Gmail.", kind: "info" });
+  }
 
   return (
     <Section title="Conexión con Gmail" sub="Aviva HR envía invitaciones y recordatorios desde tu cuenta de Google Workspace.">
@@ -247,11 +306,11 @@ function SettingsGmail() {
         </div>
         {connected ? (
           <div className="flex gap-2">
-            <Button size="sm" variant="secondary" icon={<Refresh size={12} />}>Re-autorizar</Button>
-            <Button size="sm" variant="danger">Desconectar</Button>
+            <Button size="sm" variant="secondary" icon={<Refresh size={12} />} onClick={handleOAuth}>Re-autorizar</Button>
+            <Button size="sm" variant="danger" onClick={handleDisconnect}>Desconectar</Button>
           </div>
         ) : (
-          <Button size="sm" variant="primary" icon={<Mail size={13} />}>Conectar Gmail</Button>
+          <Button size="sm" variant="primary" icon={<Mail size={13} />} onClick={handleOAuth}>Conectar Gmail</Button>
         )}
       </div>
 
@@ -380,6 +439,10 @@ function SettingsLinkDuration() {
 
 // ── Branding ──────────────────────────────────────────────────────────────────
 function SettingsBranding() {
+  const { notify } = useNotif();
+  const { data } = useDocument<{ palette: Array<{ color: string; label: string }> }>("settings", "branding");
+  const palette = data?.palette ?? [];
+
   return (
     <Section title="Marca" sub="Logo y colores de los emails y la app.">
       <div className="flex items-center gap-4 mb-6">
@@ -388,7 +451,7 @@ function SettingsBranding() {
           <div className="font-semibold text-[var(--color-ink)]">Aviva Crédito</div>
           <div className="text-[12px] text-[var(--color-ink-3)]">Logo cuadrado · 256×256 px</div>
           <div className="flex gap-2 mt-2">
-            <Button size="sm" variant="secondary">Cambiar</Button>
+            <Button size="sm" variant="secondary" onClick={() => notify({ title: "Próximamente", body: "La carga de logo se habilitará con Firebase Storage.", kind: "info" })}>Cambiar</Button>
             <Button size="sm" variant="ghost">Eliminar</Button>
           </div>
         </div>
@@ -397,13 +460,22 @@ function SettingsBranding() {
       <div className="border-t border-[var(--color-line)] pt-5">
         <div className="font-semibold text-[13px] text-[var(--color-ink)] mb-3">Paleta de marca</div>
         <div className="flex gap-4">
-          {[["#b0f5cd", "Mint"], ["#16b877", "Verde"], ["#026149", "Verde profundo"], ["#FFFFFF", "Blanco"]].map(([color, label]) => (
-            <div key={color} className="flex flex-col items-center gap-1.5">
-              <div className="size-14 rounded-xl border border-[var(--color-line)]" style={{ background: color }} />
-              <div className="text-[12px] font-medium text-[var(--color-ink)]">{label}</div>
-              <code className="text-[11px] text-[var(--color-ink-4)]">{color}</code>
-            </div>
-          ))}
+          {palette.length > 0
+            ? palette.map(({ color, label }) => (
+                <div key={color} className="flex flex-col items-center gap-1.5">
+                  <div className="size-14 rounded-xl border border-[var(--color-line)]" style={{ background: color }} />
+                  <div className="text-[12px] font-medium text-[var(--color-ink)]">{label}</div>
+                  <code className="text-[11px] text-[var(--color-ink-4)]">{color}</code>
+                </div>
+              ))
+            : [["#b0f5cd", "Mint"], ["#16b877", "Verde"], ["#026149", "Verde profundo"], ["#FFFFFF", "Blanco"]].map(([color, label]) => (
+                <div key={color} className="flex flex-col items-center gap-1.5">
+                  <div className="size-14 rounded-xl border border-[var(--color-line)]" style={{ background: color }} />
+                  <div className="text-[12px] font-medium text-[var(--color-ink)]">{label}</div>
+                  <code className="text-[11px] text-[var(--color-ink-4)]">{color}</code>
+                </div>
+              ))
+          }
         </div>
       </div>
     </Section>
@@ -411,46 +483,82 @@ function SettingsBranding() {
 }
 
 // ── Roles & Permissions ───────────────────────────────────────────────────────
-const STATIC_ROLES = [
-  { id: "r-hr",    name: "HR Business Partner", desc: "Gestión completa de personas",      color: "#16b877", members: 3,  permsActive: 8  },
-  { id: "r-it",    name: "IT / Sistemas",        desc: "Acceso a apps y equipamiento",      color: "#1b3f8a", members: 2,  permsActive: 5  },
-  { id: "r-mgr",   name: "Manager",              desc: "Revisión y aprobación de su equipo", color: "#5c2e8e", members: 8,  permsActive: 4  },
-  { id: "r-admin", name: "Administrador",         desc: "Acceso total",                      color: "#026149", members: 1,  permsActive: 12 },
-];
+interface RoleDoc { id: string; name: string; desc: string; color: string; members: number }
 
-const PERMISSION_GROUPS = [
-  {
-    group: "Directorio",
-    perms: [
-      { id: "users.read",   label: "Ver directorio",         desc: "Lista y ficha de colaboradores", scopes: ["Ninguno", "Propio hub", "Todos"] },
-      { id: "users.write",  label: "Crear y editar personas", desc: "Altas, edición de datos",       scopes: ["Ninguno", "Propio hub", "Todos"] },
-      { id: "users.delete", label: "Iniciar baja",            desc: "Crear tickets de offboarding",  scopes: ["Ninguno", "Todos"] },
-    ],
-  },
-  {
-    group: "Tickets",
-    perms: [
-      { id: "tickets.read",  label: "Ver tickets",       desc: "Bajas y transferencias",    scopes: ["Ninguno", "Propios", "Todos"] },
-      { id: "tickets.write", label: "Gestionar tickets", desc: "Aprobar y ejecutar",        scopes: ["Ninguno", "Propios", "Todos"] },
-    ],
-  },
-  {
-    group: "Administración",
-    perms: [
-      { id: "settings.write", label: "Modificar ajustes", desc: "Configuración del workspace", scopes: ["Ninguno", "Todos"] },
-      { id: "audit.read",     label: "Ver auditoría",     desc: "Log inmutable de eventos",    scopes: ["Ninguno", "Todos"] },
-    ],
-  },
-];
+const PRESET_COLORS = ["#16b877", "#1b3f8a", "#5c2e8e", "#026149", "#a8200d", "#8a5a00"];
 
-function SettingsRoles() {
+function RoleModal({
+  role,
+  onSave,
+  onClose,
+}: {
+  role: Partial<RoleDoc> | null;
+  onSave: (data: { name: string; desc: string; color: string }) => void;
+  onClose: () => void;
+}) {
+  const [name,  setName]  = useState(role?.name  ?? "");
+  const [desc,  setDesc]  = useState(role?.desc  ?? "");
+  const [color, setColor] = useState(role?.color ?? PRESET_COLORS[0]);
+
   return (
     <>
-      <Section title={`Roles (${STATIC_ROLES.length})`} sub="Cada persona pertenece a uno o varios roles. Los permisos se acumulan." action={
-        <Button size="sm" variant="primary" icon={<Plus size={13} />}>Nuevo rol</Button>
+      <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[400px] rounded-[var(--radius-lg)] bg-[var(--color-surface)] shadow-[var(--shadow-lg)] p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-[14px] text-[var(--color-ink)]">{role?.id ? "Editar rol" : "Nuevo rol"}</h3>
+          <button onClick={onClose} className="p-1 rounded text-[var(--color-ink-3)] hover:bg-[var(--color-surface-2)]"><Close size={14} /></button>
+        </div>
+        <div className="space-y-3">
+          <div>
+            <label className="text-[12px] font-medium text-[var(--color-ink-2)] mb-1 block">Nombre</label>
+            <input value={name} onChange={(e) => setName(e.target.value)}
+              className="w-full h-8 px-3 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)] text-[13px] outline-none" />
+          </div>
+          <div>
+            <label className="text-[12px] font-medium text-[var(--color-ink-2)] mb-1 block">Descripción</label>
+            <input value={desc} onChange={(e) => setDesc(e.target.value)}
+              className="w-full h-8 px-3 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)] text-[13px] outline-none" />
+          </div>
+          <div>
+            <label className="text-[12px] font-medium text-[var(--color-ink-2)] mb-2 block">Color</label>
+            <div className="flex gap-2">
+              {PRESET_COLORS.map((c) => (
+                <button key={c} onClick={() => setColor(c)}
+                  className={cn("size-7 rounded-full transition-all", color === c && "ring-2 ring-offset-1 ring-[var(--color-ink)]")}
+                  style={{ background: c }} />
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-2 justify-end pt-2">
+          <Button variant="secondary" onClick={onClose}>Cancelar</Button>
+          <Button variant="primary" onClick={() => { if (name.trim()) onSave({ name, desc, color }); }}>Guardar</Button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function SettingsRoles() {
+  const { data: roles } = useCollection<{ name: string; desc: string; color: string; members: number }>("roles");
+  const [editing, setEditing] = useState<RoleDoc | null | "new">(null);
+
+  async function handleSave(data: { name: string; desc: string; color: string }) {
+    if (editing === "new") {
+      await createDoc("roles", { ...data, members: 0 });
+    } else if (editing) {
+      await updateDocById("roles", (editing as RoleDoc).id, data);
+    }
+    setEditing(null);
+  }
+
+  return (
+    <>
+      <Section title={`Roles (${roles.length})`} sub="Cada persona pertenece a uno o varios roles. Los permisos se acumulan." action={
+        <Button size="sm" variant="primary" icon={<Plus size={13} />} onClick={() => setEditing("new")}>Nuevo rol</Button>
       }>
         <div className="grid grid-cols-2 gap-3">
-          {STATIC_ROLES.map((r) => (
+          {roles.map((r) => (
             <div key={r.id} className="flex items-center gap-3 p-4 rounded-[var(--radius-sm)] border border-[var(--color-line)]" style={{ borderLeft: `3px solid ${r.color}` }}>
               <div className="size-10 rounded-lg grid place-items-center text-[16px] font-bold shrink-0" style={{ background: r.color + "18", color: r.color }}>
                 {r.name[0]}
@@ -458,92 +566,130 @@ function SettingsRoles() {
               <div className="flex-1 min-w-0">
                 <div className="font-semibold text-[13.5px] text-[var(--color-ink)]">{r.name}</div>
                 <div className="text-[12px] text-[var(--color-ink-3)]">{r.desc}</div>
-                <div className="text-[11.5px] text-[var(--color-ink-4)] mt-0.5">{r.members} personas · {r.permsActive} permisos activos</div>
+                <div className="text-[11.5px] text-[var(--color-ink-4)] mt-0.5">{r.members} personas</div>
               </div>
-              <Button size="sm" variant="secondary">Editar</Button>
+              <Button size="sm" variant="secondary" onClick={() => setEditing(r as RoleDoc)}>Editar</Button>
             </div>
           ))}
         </div>
       </Section>
 
-      <Section title="Matriz de permisos" sub="Vista cruzada de roles × permisos.">
-        <div className="overflow-x-auto -m-5">
-          <table className="w-full text-[12.5px] border-collapse">
-            <thead>
-              <tr className="border-b border-[var(--color-line)]">
-                <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--color-ink-4)]">Permiso</th>
-                {STATIC_ROLES.map((r) => (
-                  <th key={r.id} className="px-4 py-3 text-center text-[11px] font-semibold text-[var(--color-ink-4)]" style={{ color: r.color }}>{r.name}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {PERMISSION_GROUPS.flatMap(({ group, perms }) => [
-                <tr key={group} className="bg-[var(--color-surface-2)]">
-                  <td colSpan={STATIC_ROLES.length + 1} className="px-5 py-2 text-[11px] font-bold uppercase tracking-widest text-[var(--color-ink-4)]">{group}</td>
-                </tr>,
-                ...perms.map((perm) => (
-                  <tr key={perm.id} className="border-t border-[var(--color-line)] hover:bg-[var(--color-surface-2)]">
-                    <td className="px-5 py-3">
-                      <div className="font-medium text-[var(--color-ink)]">{perm.label}</div>
-                      <div className="text-[11.5px] text-[var(--color-ink-4)]">{perm.desc}</div>
-                    </td>
-                    {STATIC_ROLES.map((r) => {
-                      const hasAll    = r.id === "r-admin" || r.id === "r-hr";
-                      const hasOwn    = hasAll || r.id === "r-mgr";
-                      const scopeIdx  = hasAll ? perm.scopes.length - 1 : hasOwn ? 1 : 0;
-                      const scope     = perm.scopes[scopeIdx] ?? "Ninguno";
-                      return (
-                        <td key={r.id} className="px-4 py-3 text-center">
-                          <span className={cn("text-[11.5px] font-medium px-2 py-0.5 rounded-full",
-                            scope === "Ninguno" ? "text-[var(--color-ink-4)]"
-                            : "bg-[var(--color-mint-50)] text-green-700"
-                          )}>{scope}</span>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                )),
-              ])}
-            </tbody>
-          </table>
+      <Section title="Matriz de permisos" sub="">
+        <div className="flex items-center gap-3 px-4 py-3 rounded-[var(--radius-sm)] bg-[var(--color-surface-2)] border border-[var(--color-line)] text-[13px] text-[var(--color-ink-3)]">
+          <Shield size={16} className="text-[var(--color-ink-4)] shrink-0" />
+          La matriz de permisos completa estará disponible en la próxima versión.
         </div>
       </Section>
+
+      {editing !== null && (
+        <RoleModal
+          role={editing === "new" ? null : editing}
+          onSave={handleSave}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </>
   );
 }
 
 // ── Approvals ─────────────────────────────────────────────────────────────────
-const APPROVAL_CHAINS = [
-  { evt: "Alta de persona",       chain: ["HR Business Partner"] },
-  { evt: "Baja por renuncia",     chain: ["Manager directo", "HR Business Partner", "IT / Sistemas"] },
-  { evt: "Baja por despido",      chain: ["HR Business Partner", "Legal", "IT / Sistemas"] },
-  { evt: "Suspensión inmediata",  chain: ["HR Business Partner", "Legal"] },
-  { evt: "Acceso a app sensible", chain: ["Manager directo", "IT / Sistemas"] },
-];
+interface ApprovalChain { evt: string; chain: string[] }
+interface ApprovalsDoc { chains: ApprovalChain[] }
+
+function ApprovalModal({
+  index,
+  chain,
+  evt,
+  onSave,
+  onClose,
+}: {
+  index: number;
+  chain: string[];
+  evt: string;
+  onSave: (index: number, chain: string[]) => void;
+  onClose: () => void;
+}) {
+  const [text, setText] = useState(chain.join(", "));
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[440px] rounded-[var(--radius-lg)] bg-[var(--color-surface)] shadow-[var(--shadow-lg)] p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-[14px] text-[var(--color-ink)]">Editar cadena · {evt}</h3>
+          <button onClick={onClose} className="p-1 rounded text-[var(--color-ink-3)] hover:bg-[var(--color-surface-2)]"><Close size={14} /></button>
+        </div>
+        <div>
+          <label className="text-[12px] font-medium text-[var(--color-ink-2)] mb-1 block">Roles separados por coma</label>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={3}
+            className="w-full px-3 py-2 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)] text-[13px] outline-none resize-none"
+          />
+          <p className="text-[11.5px] text-[var(--color-ink-4)] mt-1">Ej. Manager directo, HR Business Partner, IT / Sistemas</p>
+        </div>
+        <div className="flex gap-2 justify-end pt-2">
+          <Button variant="secondary" onClick={onClose}>Cancelar</Button>
+          <Button variant="primary" onClick={() => {
+            const parsed = text.split(",").map((s) => s.trim()).filter(Boolean);
+            onSave(index, parsed);
+          }}>Guardar</Button>
+        </div>
+      </div>
+    </>
+  );
+}
 
 function SettingsApprovals() {
+  const { data } = useDocument<ApprovalsDoc>("settings", "approvals");
+  const chains = data?.chains ?? [];
+  const [editing, setEditing] = useState<{ index: number; chain: string[]; evt: string } | null>(null);
+
+  function handleSave(index: number, newChain: string[]) {
+    if (!data) return;
+    const updatedChains = data.chains.map((c, i) =>
+      i === index ? { ...c, chain: newChain } : c
+    );
+    updateDocById("settings", "approvals", { chains: updatedChains });
+    setEditing(null);
+  }
+
   return (
-    <Section title="Cadena de aprobaciones" sub="Quién debe aprobar antes de ejecutar tareas irreversibles.">
-      <div className="space-y-0 -m-5">
-        {APPROVAL_CHAINS.map((row, i) => (
-          <div key={i} className="flex items-center gap-4 px-5 py-4 border-b border-dashed border-[var(--color-line)] last:border-0">
-            <div className="w-[200px] font-semibold text-[13.5px] text-[var(--color-ink)] shrink-0">{row.evt}</div>
-            <div className="flex flex-wrap items-center gap-2 flex-1">
-              {row.chain.map((step, j) => (
-                <div key={j} className="flex items-center gap-2">
-                  <span className="text-[12.5px] font-medium px-3 py-1.5 rounded-lg bg-[var(--color-mint-50)] text-green-700 border border-green-200">
-                    {step}
-                  </span>
-                  {j < row.chain.length - 1 && <span className="text-[var(--color-ink-4)] text-[12px]">→</span>}
-                </div>
-              ))}
+    <>
+      <Section title="Cadena de aprobaciones" sub="Quién debe aprobar antes de ejecutar tareas irreversibles.">
+        <div className="space-y-0 -m-5">
+          {chains.map((row, i) => (
+            <div key={i} className="flex items-center gap-4 px-5 py-4 border-b border-dashed border-[var(--color-line)] last:border-0">
+              <div className="w-[200px] font-semibold text-[13.5px] text-[var(--color-ink)] shrink-0">{row.evt}</div>
+              <div className="flex flex-wrap items-center gap-2 flex-1">
+                {row.chain.map((step, j) => (
+                  <div key={j} className="flex items-center gap-2">
+                    <span className="text-[12.5px] font-medium px-3 py-1.5 rounded-lg bg-[var(--color-mint-50)] text-green-700 border border-green-200">
+                      {step}
+                    </span>
+                    {j < row.chain.length - 1 && <span className="text-[var(--color-ink-4)] text-[12px]">→</span>}
+                  </div>
+                ))}
+              </div>
+              <Button size="sm" variant="secondary" onClick={() => setEditing({ index: i, chain: row.chain, evt: row.evt })}>Editar</Button>
             </div>
-            <Button size="sm" variant="secondary">Editar</Button>
-          </div>
-        ))}
-      </div>
-    </Section>
+          ))}
+          {chains.length === 0 && (
+            <div className="px-5 py-8 text-center text-[13px] text-[var(--color-ink-4)]">Cargando cadenas…</div>
+          )}
+        </div>
+      </Section>
+
+      {editing && (
+        <ApprovalModal
+          index={editing.index}
+          chain={editing.chain}
+          evt={editing.evt}
+          onSave={handleSave}
+          onClose={() => setEditing(null)}
+        />
+      )}
+    </>
   );
 }
 
@@ -570,19 +716,7 @@ function SettingsRetention() {
 }
 
 // ── Webhooks & API ────────────────────────────────────────────────────────────
-const WEBHOOKS = [
-  { url: "https://api.aviva.com/hr/people-events",  events: ["onboard.*", "offboard.*"],                  status: "ok",   last: "hace 2 min · 200" },
-  { url: "https://hooks.hubspot.com/aviva-people",  events: ["users.created", "users.updated"],            status: "ok",   last: "hace 8 min · 200" },
-  { url: "https://internal.aviva.com/audit-stream", events: ["*"],                                         status: "warn", last: "hace 14 min · 503" },
-];
-
-const API_KEYS_STATIC = [
-  { id: "k1", name: "Producción · Backend", prefix: "ak_live_w7F2", scopes: ["users:read", "users:write", "tickets:read"], lastUsed: "hace 4 min",  status: "ok" },
-  { id: "k2", name: "Staging · Backend",    prefix: "ak_test_2qD9", scopes: ["users:read", "users:write"],                lastUsed: "hace 1 h",    status: "ok" },
-  { id: "k3", name: "BI · Lectura",         prefix: "ak_live_bM4r", scopes: ["users:read", "audit:read"],                 lastUsed: "hace 2 d",    status: "ok" },
-  { id: "k4", name: "HubSpot Sync",         prefix: "ak_live_h0p1", scopes: ["users:read", "users:write", "events:write"], lastUsed: "hace 1 min", status: "ok" },
-  { id: "k5", name: "Webhooks Slack viejo", prefix: "ak_live_old3", scopes: ["events:write"],                              lastUsed: "hace 47 d",   status: "stale" },
-];
+const ALL_SCOPES = ["users:read", "users:write", "tickets:read", "audit:read", "events:write"];
 
 const API_EVENTS = [
   { id: "users.created",      desc: "Se creó un colaborador." },
@@ -595,8 +729,145 @@ const API_EVENTS = [
   { id: "sync.completed",     desc: "Sincronización con una integración terminó." },
 ];
 
+interface ApiKeyDoc { id: string; name: string; prefix: string; scopes: string[]; lastUsed: string; status: string; author: string }
+interface WebhookDoc { id: string; url: string; events: string[]; status: string; last: string }
+
+function NewApiKeyModal({ onClose }: { onClose: () => void }) {
+  const { notify } = useNotif();
+  const [name,      setName]      = useState("");
+  const [scopes,    setScopes]    = useState<string[]>([]);
+  const [generated, setGenerated] = useState<string | null>(null);
+  const [saving,    setSaving]    = useState(false);
+
+  async function generate() {
+    if (!name.trim()) return;
+    setSaving(true);
+    const prefix = "ak_live_" + Math.random().toString(36).slice(2, 6);
+    await createDoc("apiKeys", { name, prefix, scopes, lastUsed: "nunca", status: "ok", author: "Tú" });
+    setGenerated(prefix + "_•••••••••••••••••••••");
+    setSaving(false);
+  }
+
+  function copyKey() {
+    navigator.clipboard?.writeText(generated ?? "").catch(() => null);
+    notify({ title: "API Key copiada", body: "Guárdala en un lugar seguro.", kind: "info" });
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[460px] rounded-[var(--radius-lg)] bg-[var(--color-surface)] shadow-[var(--shadow-lg)] p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-[14px] text-[var(--color-ink)]">Nueva API Key</h3>
+          <button onClick={onClose} className="p-1 rounded text-[var(--color-ink-3)] hover:bg-[var(--color-surface-2)]"><Close size={14} /></button>
+        </div>
+        {!generated ? (
+          <>
+            <div>
+              <label className="text-[12px] font-medium text-[var(--color-ink-2)] mb-1 block">Nombre</label>
+              <input value={name} onChange={(e) => setName(e.target.value)}
+                placeholder="Ej. Producción · Backend"
+                className="w-full h-8 px-3 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)] text-[13px] outline-none" />
+            </div>
+            <div>
+              <label className="text-[12px] font-medium text-[var(--color-ink-2)] mb-2 block">Permisos (scopes)</label>
+              <div className="space-y-1.5">
+                {ALL_SCOPES.map((s) => (
+                  <label key={s} className="flex items-center gap-2 text-[13px] cursor-pointer">
+                    <input type="checkbox" checked={scopes.includes(s)}
+                      onChange={(e) => setScopes(e.target.checked ? [...scopes, s] : scopes.filter((x) => x !== s))}
+                      className="cursor-pointer" />
+                    <code className="font-mono text-[12px]">{s}</code>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end pt-2">
+              <Button variant="secondary" onClick={onClose}>Cancelar</Button>
+              <Button variant="primary" onClick={generate} disabled={saving || !name.trim()}>
+                {saving ? "Generando…" : "Generar API Key"}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="px-4 py-3 rounded-[var(--radius-sm)] bg-[var(--color-mint-50)] border border-green-200">
+              <div className="text-[12px] text-green-700 font-medium mb-1">API Key generada · cópiala ahora</div>
+              <code className="text-[13px] font-mono text-[var(--color-ink)] break-all">{generated}</code>
+            </div>
+            <p className="text-[12px] text-[var(--color-ink-4)]">No podrás volver a ver el valor completo.</p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="primary" icon={<Copy size={13} />} onClick={copyKey}>Copiar y cerrar</Button>
+            </div>
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
+function WebhookModal({
+  webhook,
+  onClose,
+}: {
+  webhook: WebhookDoc | null;
+  onClose: () => void;
+}) {
+  const [url,       setUrl]       = useState(webhook?.url       ?? "");
+  const [eventsStr, setEventsStr] = useState(webhook?.events?.join(", ") ?? "");
+  const [saving,    setSaving]    = useState(false);
+
+  async function handleSave() {
+    if (!url.trim()) return;
+    setSaving(true);
+    const events = eventsStr.split(",").map((s) => s.trim()).filter(Boolean);
+    if (webhook) {
+      await updateDocById("webhooks", webhook.id, { url, events });
+    } else {
+      await createDoc("webhooks", { url, events, status: "ok", last: "nunca" });
+    }
+    setSaving(false);
+    onClose();
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[460px] rounded-[var(--radius-lg)] bg-[var(--color-surface)] shadow-[var(--shadow-lg)] p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-[14px] text-[var(--color-ink)]">{webhook ? "Editar webhook" : "Nuevo webhook"}</h3>
+          <button onClick={onClose} className="p-1 rounded text-[var(--color-ink-3)] hover:bg-[var(--color-surface-2)]"><Close size={14} /></button>
+        </div>
+        <div>
+          <label className="text-[12px] font-medium text-[var(--color-ink-2)] mb-1 block">URL del endpoint</label>
+          <input value={url} onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://api.example.com/webhook"
+            className="w-full h-8 px-3 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)] text-[13px] outline-none" />
+        </div>
+        <div>
+          <label className="text-[12px] font-medium text-[var(--color-ink-2)] mb-1 block">Eventos (separados por coma)</label>
+          <textarea value={eventsStr} onChange={(e) => setEventsStr(e.target.value)}
+            rows={3} placeholder="onboard.*, offboard.*, users.created"
+            className="w-full px-3 py-2 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)] text-[13px] outline-none resize-none" />
+        </div>
+        <div className="flex gap-2 justify-end pt-2">
+          <Button variant="secondary" onClick={onClose}>Cancelar</Button>
+          <Button variant="primary" onClick={handleSave} disabled={saving || !url.trim()}>
+            {saving ? "Guardando…" : "Guardar"}
+          </Button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 function SettingsWebhooks() {
-  const [copied, setCopied] = useState<string | null>(null);
+  const { notify } = useNotif();
+  const { data: apiKeys }  = useCollection<{ name: string; prefix: string; scopes: string[]; lastUsed: string; status: string; author: string }>("apiKeys");
+  const { data: webhooks } = useCollection<{ url: string; events: string[]; status: string; last: string }>("webhooks");
+  const [copied,       setCopied]       = useState<string | null>(null);
+  const [showNewKey,   setShowNewKey]   = useState(false);
+  const [webhookModal, setWebhookModal] = useState<WebhookDoc | null | "new">(null);
 
   function copy(text: string, key: string) {
     navigator.clipboard?.writeText(text).catch(() => null);
@@ -604,14 +875,23 @@ function SettingsWebhooks() {
     setTimeout(() => setCopied(null), 2000);
   }
 
+  function handleRevoke(id: string) {
+    if (!confirm("¿Revocar esta API Key?")) return;
+    deleteDocById("apiKeys", id);
+  }
+
+  function handleRotate() {
+    notify({ title: "Rotar API Key", body: "La rotación de keys se ejecuta desde el panel de administración.", kind: "info" });
+  }
+
   return (
     <>
       <Section title="API Keys" sub="Para conectar Aviva HR a tus servicios." action={
-        <Button size="sm" variant="primary" icon={<Plus size={13} />}>Nueva API Key</Button>
+        <Button size="sm" variant="primary" icon={<Plus size={13} />} onClick={() => setShowNewKey(true)}>Nueva API Key</Button>
       }>
         <div className="space-y-0 -m-5">
-          {API_KEYS_STATIC.map((k, i) => (
-            <div key={k.id} className={cn("flex items-start gap-3 px-5 py-4", i < API_KEYS_STATIC.length - 1 && "border-b border-[var(--color-line)]")}>
+          {apiKeys.map((k, i) => (
+            <div key={k.id} className={cn("flex items-start gap-3 px-5 py-4", i < apiKeys.length - 1 && "border-b border-[var(--color-line)]")}>
               <div className="size-9 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-line)] grid place-items-center shrink-0">
                 <Shield size={14} className="text-[var(--color-ink-3)]" />
               </div>
@@ -632,19 +912,23 @@ function SettingsWebhooks() {
                 <Button size="sm" variant="secondary" icon={<Copy size={12} />} onClick={() => copy(k.prefix, k.id)}>
                   {copied === k.id ? "¡Copiado!" : "Copiar"}
                 </Button>
-                <Button size="sm" variant="danger">Revocar</Button>
+                <Button size="sm" variant="secondary" onClick={handleRotate}>Rotar</Button>
+                <Button size="sm" variant="danger" onClick={() => handleRevoke(k.id)}>Revocar</Button>
               </div>
             </div>
           ))}
+          {apiKeys.length === 0 && (
+            <div className="px-5 py-8 text-center text-[13px] text-[var(--color-ink-4)]">Sin API Keys. Crea la primera.</div>
+          )}
         </div>
       </Section>
 
       <Section title="Webhooks salientes" sub="Aviva HR envía eventos POST JSON a estos endpoints." action={
-        <Button size="sm" variant="primary" icon={<Plus size={13} />}>Nuevo webhook</Button>
+        <Button size="sm" variant="primary" icon={<Plus size={13} />} onClick={() => setWebhookModal("new")}>Nuevo webhook</Button>
       }>
         <div className="space-y-0 -m-5">
-          {WEBHOOKS.map((h, i) => (
-            <div key={i} className={cn("flex items-start gap-3 px-5 py-4 flex-wrap", i < WEBHOOKS.length - 1 && "border-b border-[var(--color-line)]")}>
+          {webhooks.map((h, i) => (
+            <div key={h.id} className={cn("flex items-start gap-3 px-5 py-4 flex-wrap", i < webhooks.length - 1 && "border-b border-[var(--color-line)]")}>
               <code className="text-[12px] font-mono bg-[var(--color-surface-2)] px-2 py-1 rounded text-[var(--color-ink-2)] truncate max-w-[280px]">{h.url}</code>
               <div className="flex flex-wrap gap-1">
                 {h.events.map((e) => <span key={e} className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-[var(--color-surface-2)] border border-[var(--color-line)] text-[var(--color-ink-3)]">{e}</span>)}
@@ -654,10 +938,13 @@ function SettingsWebhooks() {
                 <span className={cn("text-[11.5px] font-medium px-2 py-0.5 rounded-full",
                   h.status === "ok" ? "bg-[var(--color-mint-50)] text-green-700" : "bg-[var(--color-warn-bg)] text-[var(--color-warn-fg)]"
                 )}>{h.status === "ok" ? "OK" : "1 fallo"}</span>
-                <Button size="sm" variant="secondary">Editar</Button>
+                <Button size="sm" variant="secondary" onClick={() => setWebhookModal(h as WebhookDoc)}>Editar</Button>
               </div>
             </div>
           ))}
+          {webhooks.length === 0 && (
+            <div className="px-5 py-8 text-center text-[13px] text-[var(--color-ink-4)]">Sin webhooks configurados.</div>
+          )}
         </div>
       </Section>
 
@@ -667,14 +954,17 @@ function SettingsWebhooks() {
             <div key={e.id} className={cn("flex items-center gap-4 px-5 py-3", i < API_EVENTS.length - 1 && "border-b border-[var(--color-line)]")}>
               <code className="text-[12.5px] font-mono font-semibold text-green-700 w-52 shrink-0">{e.id}</code>
               <span className="text-[13px] text-[var(--color-ink-3)] flex-1">{e.desc}</span>
-              <Button size="sm" variant="ghost">Ver schema</Button>
+              <Button size="sm" variant="ghost"
+                onClick={() => notify({ title: "Schema de evento", body: `El schema de ${e.id} está disponible en la documentación REST.`, kind: "info" })}>
+                Ver schema
+              </Button>
             </div>
           ))}
         </div>
       </Section>
 
       <Section title="Documentación REST" sub={`Base URL: ${import.meta.env.VITE_FIREBASE_PROJECT_ID ? `https://api.avivacredito.com/hr/v1` : "(configura VITE_API_BASE_URL)"}`} action={
-        <Button size="sm" variant="secondary" icon={<Link size={12} />}>Abrir docs</Button>
+        <Button size="sm" variant="secondary" icon={<Link size={12} />} onClick={() => window.open("https://api.avivacredito.com/hr/v1/docs", "_blank")}>Abrir docs</Button>
       }>
         <div className="space-y-2">
           {[
@@ -698,6 +988,14 @@ function SettingsWebhooks() {
           })}
         </div>
       </Section>
+
+      {showNewKey && <NewApiKeyModal onClose={() => setShowNewKey(false)} />}
+      {webhookModal !== null && (
+        <WebhookModal
+          webhook={webhookModal === "new" ? null : webhookModal}
+          onClose={() => setWebhookModal(null)}
+        />
+      )}
     </>
   );
 }

@@ -1,8 +1,10 @@
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useUsers } from "@/hooks/useUsers";
 import { useIntegrations } from "@/hooks/useIntegrations";
 import { updateUser } from "@/services/users";
 import { useCatalog } from "@/context/CatalogContext";
+import { useNotif } from "@/context/NotifContext";
 import type { User } from "@/data/types";
 import { Avatar } from "@/components/ui/Avatar";
 import { StatusBadge } from "@/components/ui/Badge";
@@ -216,14 +218,14 @@ function UserCard({ user, selected, onToggle, onClick, hubLabel }: {
 }
 
 // ── Bulk action bar ───────────────────────────────────────────────────────────
-function BulkBar({ count, onClear }: { count: number; onClear: () => void }) {
+function BulkBar({ count, onClear, onOffboard }: { count: number; onClear: () => void; onOffboard: () => void }) {
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 px-5 py-3 rounded-full bg-[var(--color-ink)] text-white shadow-[var(--shadow-lg)]">
       <span className="font-bold text-[13px]">{count} seleccionado{count > 1 ? "s" : ""}</span>
       <div className="w-px h-4 bg-white/20" />
       <button className="text-[12.5px] hover:text-green-300 transition-colors">Asignar equipo</button>
       <button className="text-[12.5px] hover:text-green-300 transition-colors">Sincronizar</button>
-      <button className="text-[12.5px] text-[var(--color-danger-fg)] hover:opacity-80 transition-opacity">Iniciar baja</button>
+      <button onClick={onOffboard} className="text-[12.5px] text-[var(--color-danger-fg)] hover:opacity-80 transition-opacity">Iniciar baja</button>
       <div className="w-px h-4 bg-white/20" />
       <button onClick={onClear} className="text-[12px] text-white/60 hover:text-white transition-colors">Cancelar</button>
     </div>
@@ -234,6 +236,8 @@ function BulkBar({ count, onClear }: { count: number; onClear: () => void }) {
 export function DirectoryView() {
   const { hubs, hubLabel, estados } = useCatalog();
   const { data: users, loading, error } = useUsers();
+  const { notify } = useNotif();
+  const navigate = useNavigate();
   const [tab,      setTab]      = useState<StatusTab>("all");
   const [query,    setQuery]    = useState("");
   const [hubF,     setHubF]     = useState("all");
@@ -243,6 +247,24 @@ export function DirectoryView() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [drawer,   setDrawer]   = useState<(User & { id: string }) | null>(null);
   const [importing, setImporting] = useState(false);
+
+  function exportCSV() {
+    const headers = ["Número","Nombre completo","Email","Puesto","Hub","Quiósco","Estado","Empresa","Estatus","Antigüedad (meses)"];
+    const rows = filtered.map(u => [
+      u.numColaborador, u.fullName, u.email, u.role,
+      hubLabel(u.hub), u.quiosco, u.estado, u.empresa, u.status, u.hireMonths,
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(c => `"${String(c??'').replace(/"/g,'""')}"`).join(",")).join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], {type:"text/csv"}));
+    a.download = `directorio-aviva-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+  }
+
+  function handleOffboard() {
+    notify({ title: "Iniciar baja", body: `${selected.size} colaborador${selected.size > 1 ? "es" : ""} marcado${selected.size > 1 ? "s" : ""} para baja. Abre un ticket para continuar.`, kind: "offboard" });
+    navigate("/tickets");
+  }
 
   const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
@@ -327,9 +349,9 @@ export function DirectoryView() {
                 <GridIcon size={14} />
               </button>
             </div>
-            <Button variant="secondary" size="sm" icon={<Download size={13} />}>Exportar CSV</Button>
+            <Button variant="secondary" size="sm" icon={<Download size={13} />} onClick={exportCSV}>Exportar CSV</Button>
             <Button variant="secondary" size="sm" icon={<Upload size={13} />} onClick={() => setImporting(true)}>Importar</Button>
-            <Button variant="primary"   size="sm" icon={<UserPlus size={14} />}>Nueva alta</Button>
+            <Button variant="primary"   size="sm" icon={<UserPlus size={14} />} onClick={() => notify({ title: "Alta de persona", body: "Completa el formulario de alta próximamente disponible.", kind: "info" })}>Nueva alta</Button>
           </div>
         </div>
 
@@ -452,7 +474,7 @@ export function DirectoryView() {
 
       {/* Bulk bar */}
       {selected.size > 0 && (
-        <BulkBar count={selected.size} onClear={() => setSelected(new Set())} />
+        <BulkBar count={selected.size} onClear={() => setSelected(new Set())} onOffboard={handleOffboard} />
       )}
 
       {/* Import wizard */}

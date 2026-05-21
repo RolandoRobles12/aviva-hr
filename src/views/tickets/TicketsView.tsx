@@ -1,7 +1,9 @@
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTickets } from "@/hooks/useTickets";
 import { useUsers } from "@/hooks/useUsers";
 import { submitApproval } from "@/services/tickets";
+import { useNotif } from "@/context/NotifContext";
 import type { Ticket } from "@/data/types";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
@@ -126,9 +128,17 @@ function TicketDetail({
 export function TicketsView() {
   const { data: tickets,  loading: lt, error: et } = useTickets();
   const { data: users,    loading: lu }             = useUsers();
+  const { notify } = useNotif();
+  const navigate   = useNavigate();
   const [statusF,  setStatusF]  = useState<StatusKey>("all");
   const [selected, setSelected] = useState<(Ticket & { id: string }) | null>(null);
   const [chooser,  setChooser]  = useState(false);
+
+  function handleTicketSelect(id: string) {
+    setChooser(false);
+    if (id === "import") { navigate("/directory"); return; }
+    notify({ title: `Nuevo ticket · ${id}`, body: "El formulario se abrirá en la siguiente versión.", kind: "info" });
+  }
 
   const filtered = useMemo(() => {
     if (statusF === "all") return tickets;
@@ -222,7 +232,7 @@ export function TicketsView() {
         <TicketDetail ticket={selected} userName={userName(selected.userId)} onClose={() => setSelected(null)} />
       )}
       {chooser && (
-        <NewTicketChooser onClose={() => setChooser(false)} onSelect={() => {}} />
+        <NewTicketChooser onClose={() => setChooser(false)} onSelect={handleTicketSelect} />
       )}
     </div>
   );
