@@ -2,14 +2,143 @@ import { useState, useMemo } from "react";
 import { useCandidates } from "@/hooks/useCandidates";
 import { updateCandidateStage } from "@/services/candidates";
 import { useCatalog } from "@/context/CatalogContext";
+import { useAuth } from "@/context/AuthContext";
+import { useNotif } from "@/context/NotifContext";
+import { createDoc } from "@/hooks/useFirestore";
 import type { Candidate } from "@/data/types";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Drawer } from "@/components/ui/Drawer";
 import { LoadingView, ErrorView } from "@/components/ui/Spinner";
-import { Search, Plus, ChevronRight, CheckCircle2, Clock, XCircle } from "@/components/icons";
+import { Search, Plus, ChevronRight, CheckCircle2, Clock, XCircle, Close } from "@/components/icons";
 import { cn } from "@/lib/cn";
+
+// ── New Candidate Modal ────────────────────────────────────────────────────────
+function NewCandidateModal({ onClose }: { onClose: () => void }) {
+  const { hubs, estados } = useCatalog();
+  const { appUser } = useAuth();
+  const { notify } = useNotif();
+  const [saving, setSaving] = useState(false);
+
+  const [first,     setFirst]     = useState("");
+  const [last,      setLast]      = useState("");
+  const [position,  setPosition]  = useState("");
+  const [hub,       setHub]       = useState("");
+  const [quiosco,   setQuiosco]   = useState("");
+  const [estado,    setEstado]    = useState("");
+  const [recruiter, setRecruiter] = useState(appUser?.fullName ?? "");
+  const [email,     setEmail]     = useState("");
+  const [phone,     setPhone]     = useState("");
+  const [salary,    setSalary]    = useState("");
+  const [startDate, setStartDate] = useState("");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const now = new Date().toISOString().slice(0, 10);
+      await createDoc("candidates", {
+        first, last,
+        fullName: `${first} ${last}`,
+        position, hub, quiosco, estado,
+        recruiter,
+        email, phone,
+        salary,
+        startDate,
+        stage: "offer_sent",
+        avatar: {
+          initials: (first[0] ?? "?").toUpperCase() + (last[0] ?? "").toUpperCase(),
+          color: "c2",
+        },
+        docs: [],
+        answers: [],
+        timeline: [{ state: "current", title: "Candidato registrado", who: recruiter, when: now }],
+        createdAt: now,
+      });
+      notify({ title: "Candidato registrado", body: `${first} ${last} · etapa: Carta enviada.`, kind: "onboard" });
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const inputClass = "h-9 w-full px-3 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)] text-[13px] outline-none";
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[520px] max-h-[90vh] overflow-y-auto rounded-[var(--radius-lg)] bg-[var(--color-surface)] shadow-[var(--shadow-lg)] p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-[15px] text-[var(--color-ink)]">Nuevo candidato</h2>
+          <button onClick={onClose} className="p-1 rounded-md text-[var(--color-ink-3)] hover:bg-[var(--color-surface-2)] transition-colors">
+            <Close size={16} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Nombre *</label>
+              <input className={inputClass} required value={first} onChange={(e) => setFirst(e.target.value)} placeholder="Juan" />
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Apellidos *</label>
+              <input className={inputClass} required value={last} onChange={(e) => setLast(e.target.value)} placeholder="García López" />
+            </div>
+            <div className="col-span-2">
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Puesto *</label>
+              <input className={inputClass} required value={position} onChange={(e) => setPosition(e.target.value)} placeholder="Ej. Promotor de campo" />
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Hub</label>
+              <select className={inputClass} value={hub} onChange={(e) => setHub(e.target.value)}>
+                <option value="">Sin asignar</option>
+                {hubs.map((h) => <option key={h.id} value={h.id}>{h.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Estado</label>
+              <select className={inputClass} value={estado} onChange={(e) => setEstado(e.target.value)}>
+                <option value="">Sin asignar</option>
+                {estados.map((est) => <option key={est} value={est}>{est}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Quiósco</label>
+              <input className={inputClass} value={quiosco} onChange={(e) => setQuiosco(e.target.value)} placeholder="Nombre del quiósco" />
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Reclutador</label>
+              <input className={inputClass} value={recruiter} onChange={(e) => setRecruiter(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Email</label>
+              <input type="email" className={inputClass} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="candidato@email.com" />
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Teléfono</label>
+              <input className={inputClass} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+52 55 0000 0000" />
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Salario bruto</label>
+              <input className={inputClass} value={salary} onChange={(e) => setSalary(e.target.value)} placeholder="$15,000" />
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Fecha de inicio prevista</label>
+              <input type="date" className={inputClass} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="secondary" size="sm" onClick={onClose}>Cancelar</Button>
+            <Button type="submit" variant="primary" size="sm" disabled={saving}>
+              {saving ? "Guardando…" : "Registrar candidato"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </>
+  );
+}
 
 const TABS = [
   { id: "all",       label: "Todos" },
@@ -160,6 +289,7 @@ export function CandidatesView() {
   const [tab, setTab]         = useState("all");
   const [query, setQuery]     = useState("");
   const [selected, setSelected] = useState<(Candidate & { id: string }) | null>(null);
+  const [newCandOpen, setNewCandOpen] = useState(false);
 
   const filtered = useMemo(() => {
     let list = candidates;
@@ -230,7 +360,7 @@ export function CandidatesView() {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          <Button variant="primary" size="sm" icon={<Plus />}>Nuevo candidato</Button>
+          <Button variant="primary" size="sm" icon={<Plus />} onClick={() => setNewCandOpen(true)}>Nuevo candidato</Button>
         </div>
       </div>
 
@@ -298,6 +428,7 @@ export function CandidatesView() {
       </div>
 
       {selected && <CandidateDetail candidate={selected} onClose={() => setSelected(null)} />}
+      {newCandOpen && <NewCandidateModal onClose={() => setNewCandOpen(false)} />}
     </div>
   );
 }

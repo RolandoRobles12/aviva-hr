@@ -1,11 +1,13 @@
 import { useState, useMemo } from "react";
 import { useLocations, type Location } from "@/hooks/useLocations";
+import { createDoc, updateDocById, deleteDocById } from "@/hooks/useFirestore";
 import { LoadingView, ErrorView } from "@/components/ui/Spinner";
 import { Button } from "@/components/ui/Button";
 import { Drawer } from "@/components/ui/Drawer";
-import { Search, Plus, ChevronRight } from "@/components/icons";
+import { Search, Plus, ChevronRight, Close } from "@/components/icons";
 import { cn } from "@/lib/cn";
 import { useCatalog } from "@/context/CatalogContext";
+import { useNotif } from "@/context/NotifContext";
 
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
   open:   { label: "Abierto",         color: "#026149", bg: "#e7f8ef" },
@@ -13,11 +15,180 @@ const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }
   closed: { label: "Cerrado",         color: "#6b716b", bg: "#f1f1ee" },
 };
 
-function LocationDetail({ loc, onClose }: { loc: Location & { id: string }; onClose: () => void }) {
+const CAT_MAP: Record<string, { label: string; short: string; color: string; bg: string }> = {
+  "Aviva tu Compra":      { label: "Aviva tu Compra",      short: "AtC", color: "#1b3f8a", bg: "#e3eeff" },
+  "Aviva tu Negocio":     { label: "Aviva tu Negocio",     short: "AtN", color: "#026149", bg: "#e7f8ef" },
+  "Casa Marchand":        { label: "Casa Marchand",        short: "CM",  color: "#5c2e8e", bg: "#ece2f5" },
+  "Aviva tu Compra · BA": { label: "Aviva tu Compra · BA", short: "BA",  color: "#8a5a00", bg: "#fff3d6" },
+  "Corporativo":          { label: "Corporativo",          short: "Corp",color: "#3a3a3a", bg: "#f1f1ee" },
+};
+const DEFAULT_CAT = { label: "Quiósco", short: "Q", color: "#1b3f8a", bg: "#e3eeff" };
+
+function getCatFields(producto: string) {
+  return CAT_MAP[producto] ?? DEFAULT_CAT;
+}
+
+// ── Location Modal ─────────────────────────────────────────────────────────────
+function LocationModal({
+  loc,
+  onClose,
+}: {
+  loc: (Location & { id: string }) | "new";
+  onClose: () => void;
+}) {
+  const { estados } = useCatalog();
+  const { notify } = useNotif();
+  const isNew = loc === "new";
+  const existing = isNew ? null : loc;
+
+  const [code,          setCode]          = useState(existing?.code ?? "");
+  const [ciudad,        setCiudad]        = useState(existing?.ciudad ?? "");
+  const [estado,        setEstado]        = useState(existing?.estado ?? "");
+  const [direccion,     setDireccion]     = useState(existing?.direccion ?? "");
+  const [gerente,       setGerente]       = useState(existing?.gerente ?? "");
+  const [hub,           setHub]           = useState(existing?.hub ?? "");
+  const [fechaApertura, setFechaApertura] = useState(existing?.fechaApertura ?? "");
+  const [status,        setStatus]        = useState<"open" | "vacant" | "closed">(existing?.status ?? "open");
+  const [producto,      setProducto]      = useState(existing?.producto ?? "");
+  const [ubicacion,     setUbicacion]     = useState(existing?.ubicacion ?? "");
+  const [saving,        setSaving]        = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const catFields = getCatFields(producto);
+      const allFields = {
+        code, ciudad, estado, direccion, gerente, hub,
+        fechaApertura, status, producto, ubicacion,
+        categoria: producto,
+        catLabel: catFields.label,
+        catShort: catFields.short,
+        catColor: catFields.color,
+        catBg: catFields.bg,
+      };
+      if (isNew) {
+        await createDoc("locations", allFields);
+        notify({ title: "Locación creada", body: `${ubicacion || ciudad} registrada correctamente.`, kind: "onboard" });
+      } else {
+        await updateDocById("locations", existing!.id, allFields);
+        notify({ title: "Locación actualizada", body: `${ubicacion || ciudad} actualizada.`, kind: "info" });
+      }
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!existing) return;
+    if (!confirm(`¿Eliminar la locación "${existing.ubicacion ?? existing.ciudad}"? Esta acción no se puede deshacer.`)) return;
+    await deleteDocById("locations", existing.id);
+    onClose();
+  }
+
+  const inputClass = "h-9 w-full px-3 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)] text-[13px] outline-none";
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[520px] max-h-[90vh] overflow-y-auto rounded-[var(--radius-lg)] bg-[var(--color-surface)] shadow-[var(--shadow-lg)] p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-[15px] text-[var(--color-ink)]">
+            {isNew ? "Nueva locación" : "Editar locación"}
+          </h2>
+          <button onClick={onClose} className="p-1 rounded-md text-[var(--color-ink-3)] hover:bg-[var(--color-surface-2)] transition-colors">
+            <Close size={16} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Código *</label>
+              <input className={inputClass} required value={code} onChange={(e) => setCode(e.target.value)} placeholder="MEX-001" />
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Ciudad *</label>
+              <input className={inputClass} required value={ciudad} onChange={(e) => setCiudad(e.target.value)} placeholder="Ciudad de México" />
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Estado *</label>
+              <select className={inputClass} required value={estado} onChange={(e) => setEstado(e.target.value)}>
+                <option value="">Seleccionar…</option>
+                {estados.map((est) => <option key={est} value={est}>{est}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Fecha de apertura *</label>
+              <input type="date" className={inputClass} required value={fechaApertura} onChange={(e) => setFechaApertura(e.target.value)} />
+            </div>
+            <div className="col-span-2">
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Dirección</label>
+              <input className={inputClass} value={direccion} onChange={(e) => setDireccion(e.target.value)} placeholder="Calle, número, colonia" />
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Gerente</label>
+              <input className={inputClass} value={gerente} onChange={(e) => setGerente(e.target.value)} placeholder="Nombre del gerente" />
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Hub</label>
+              <input className={inputClass} value={hub} onChange={(e) => setHub(e.target.value)} placeholder="ID del hub" />
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Estatus</label>
+              <select className={inputClass} value={status} onChange={(e) => setStatus(e.target.value as "open" | "vacant" | "closed")}>
+                <option value="open">Abierto</option>
+                <option value="vacant">Sin cobertura</option>
+                <option value="closed">Cerrado</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Producto</label>
+              <select className={inputClass} value={producto} onChange={(e) => setProducto(e.target.value)}>
+                <option value="">Sin asignar</option>
+                {Object.keys(CAT_MAP).map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Nombre de pantalla (ubicación)</label>
+              <input className={inputClass} value={ubicacion} onChange={(e) => setUbicacion(e.target.value)} placeholder="Nombre para mostrar" />
+            </div>
+          </div>
+          <div className="flex justify-between gap-2 pt-2">
+            {!isNew && (
+              <Button type="button" variant="danger" size="sm" onClick={handleDelete}>Eliminar</Button>
+            )}
+            <div className="flex gap-2 ml-auto">
+              <Button type="button" variant="secondary" size="sm" onClick={onClose}>Cancelar</Button>
+              <Button type="submit" variant="primary" size="sm" disabled={saving}>
+                {saving ? "Guardando…" : isNew ? "Crear" : "Guardar"}
+              </Button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </>
+  );
+}
+
+function LocationDetail({
+  loc,
+  onClose,
+  onEdit,
+}: {
+  loc: Location & { id: string };
+  onClose: () => void;
+  onEdit: () => void;
+}) {
   const statusCfg = STATUS_LABELS[loc.status] ?? STATUS_LABELS.open;
   return (
     <Drawer open onClose={onClose} title={loc.ubicacion ?? loc.ciudad} subtitle={`${loc.catLabel} · ${loc.estado}`}>
       <div className="px-6 py-5 space-y-5">
+        {/* Header actions */}
+        <div className="flex items-center gap-2 justify-end">
+          <Button variant="secondary" size="sm" onClick={onEdit}>Editar</Button>
+        </div>
+
         {/* Category badge */}
         <div className="flex items-center gap-3">
           <div className="size-10 rounded-[var(--radius-sm)] grid place-items-center text-[12px] font-bold"
@@ -84,6 +255,7 @@ export function LocationsView() {
   const [estadoF, setEstadoF] = useState("all");
   const [statusF, setStatusF] = useState("all");
   const [selected, setSelected] = useState<(Location & { id: string }) | null>(null);
+  const [locModal, setLocModal] = useState<(Location & { id: string }) | "new" | null>(null);
 
   const filtered = useMemo(() => {
     const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -134,7 +306,7 @@ export function LocationsView() {
         </select>
         <div className="ml-auto flex items-center gap-2">
           <span className="text-[12px] text-[var(--color-ink-4)]">{filtered.length} locaciones</span>
-          <Button variant="primary" size="sm" icon={<Plus size={14} />}>Nueva locación</Button>
+          <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={() => setLocModal("new")}>Nueva locación</Button>
         </div>
       </div>
 
@@ -186,7 +358,16 @@ export function LocationsView() {
         </table>
       </div>
 
-      {selected && <LocationDetail loc={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <LocationDetail
+          loc={selected}
+          onClose={() => setSelected(null)}
+          onEdit={() => { setLocModal(selected); setSelected(null); }}
+        />
+      )}
+      {locModal && (
+        <LocationModal loc={locModal} onClose={() => setLocModal(null)} />
+      )}
     </div>
   );
 }
