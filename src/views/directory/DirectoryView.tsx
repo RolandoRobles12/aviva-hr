@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useUsers } from "@/hooks/useUsers";
 import { useIntegrations } from "@/hooks/useIntegrations";
 import { updateUser, createUser } from "@/services/users";
+import { useCollection } from "@/hooks/useFirestore";
 import { useCatalog } from "@/context/CatalogContext";
 import { useNotif } from "@/context/NotifContext";
 import type { User } from "@/data/types";
@@ -18,35 +19,50 @@ import {
 } from "@/components/icons";
 import { cn } from "@/lib/cn";
 
+const AREAS = [
+  "Kiosk Acquisitions", "Growth", "Sales", "Operaciones",
+  "People & Culture", "Legal", "Finanzas", "Tecnología", "Agencia",
+];
+const TALLAS = ["CH", "M", "G", "XG", "XXG"];
+
 // ── New User Modal ─────────────────────────────────────────────────────────────
 function NewUserModal({ onClose }: { onClose: () => void }) {
   const { hubs, estados } = useCatalog();
   const { notify } = useNotif();
+  const { data: positions } = useCollection<{ name: string }>("catalog/positions/items");
+  const { data: quioscos } = useCollection<{ name: string }>("catalog/quioscos/items");
+  const { data: allUsers } = useUsers();
   const [saving, setSaving] = useState(false);
 
   const [numColaborador, setNumColaborador] = useState("");
-  const [first, setFirst]     = useState("");
-  const [last,  setLast]      = useState("");
-  const [email, setEmail]     = useState("");
-  const [role,  setRole]      = useState("");
-  const [hub,   setHub]       = useState("");
-  const [quiosco, setQuiosco] = useState("");
-  const [estado,  setEstado]  = useState("");
-  const [empresa, setEmpresa] = useState("Aviva Crédito");
-  const [genero,  setGenero]  = useState<"H" | "M">("H");
-  const [talla,   setTalla]   = useState("M");
-  const [phone,   setPhone]   = useState("");
+  const [first, setFirst]       = useState("");
+  const [last,  setLast]        = useState("");
+  const [email, setEmail]       = useState("");
+  const [role,  setRole]        = useState("");
+  const [area,  setArea]        = useState("");
+  const [hub,   setHub]         = useState("");
+  const [quiosco, setQuiosco]   = useState("");
+  const [estado,  setEstado]    = useState("");
+  const [empresa, setEmpresa]   = useState("Aviva Crédito");
+  const [genero,  setGenero]    = useState<"H" | "M">("H");
+  const [talla,   setTalla]     = useState("M");
+  const [phone,   setPhone]     = useState("");
+  const [managerId, setManagerId] = useState("");
+  const [dealOwner, setDealOwner] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     try {
+      const mgr = allUsers.find((u) => u.id === managerId);
       await createUser({
         numColaborador, first, last,
         fullName: `${first} ${last}`,
-        email, role, hub, quiosco, estado, empresa,
+        email, role, area, hub, quiosco, estado, empresa,
         genero, talla, phone,
-        manager: null, managerName: null,
+        dealOwner,
+        manager: managerId || null,
+        managerName: mgr?.fullName ?? null,
         avatar: {
           initials: (first[0] ?? "?").toUpperCase() + (last[0] ?? "").toUpperCase(),
           color: "c1",
@@ -56,7 +72,6 @@ function NewUserModal({ onClose }: { onClose: () => void }) {
         status: "invited",
         laptop: null, tablets: [], access: [],
         hubspot: null,
-        id: "",
       });
       notify({ title: "Alta creada", body: `${first} ${last} · Invitación pendiente.`, kind: "onboard" });
       onClose();
@@ -96,11 +111,28 @@ function NewUserModal({ onClose }: { onClose: () => void }) {
               <input className={inputClass} required value={last} onChange={(e) => setLast(e.target.value)} placeholder="García López" />
             </div>
             <div className="col-span-2">
-              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Puesto / Role *</label>
-              <input className={inputClass} required value={role} onChange={(e) => setRole(e.target.value)} placeholder="Ej. Promotor de campo" />
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Puesto *</label>
+              <select className={inputClass} required value={role} onChange={(e) => setRole(e.target.value)}>
+                <option value="">Seleccionar puesto…</option>
+                {positions.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
+              </select>
             </div>
             <div>
-              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Hub</label>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Área</label>
+              <select className={inputClass} value={area} onChange={(e) => setArea(e.target.value)}>
+                <option value="">Sin asignar</option>
+                {AREAS.map((a) => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Jefe inmediato</label>
+              <select className={inputClass} value={managerId} onChange={(e) => setManagerId(e.target.value)}>
+                <option value="">Sin asignar</option>
+                {allUsers.map((u) => <option key={u.id} value={u.id}>{u.fullName}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Hub o equipo</label>
               <select className={inputClass} value={hub} onChange={(e) => setHub(e.target.value)}>
                 <option value="">Sin asignar</option>
                 {hubs.map((h) => <option key={h.id} value={h.id}>{h.label}</option>)}
@@ -115,28 +147,39 @@ function NewUserModal({ onClose }: { onClose: () => void }) {
             </div>
             <div>
               <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Quiósco</label>
-              <input className={inputClass} value={quiosco} onChange={(e) => setQuiosco(e.target.value)} placeholder="Nombre del quiósco" />
+              <select className={inputClass} value={quiosco} onChange={(e) => setQuiosco(e.target.value)}>
+                <option value="">Sin asignar</option>
+                {quioscos.map((q) => <option key={q.id} value={q.name}>{q.name}</option>)}
+              </select>
             </div>
             <div>
               <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Empresa</label>
-              <input className={inputClass} value={empresa} onChange={(e) => setEmpresa(e.target.value)} />
+              <select className={inputClass} value={empresa} onChange={(e) => setEmpresa(e.target.value)}>
+                <option value="Aviva Crédito">Aviva Crédito</option>
+                <option value="Aviva Financial">Aviva Financial</option>
+                <option value="Ejecutando Ideas">Ejecutando Ideas</option>
+              </select>
             </div>
             <div>
               <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Género</label>
               <select className={inputClass} value={genero} onChange={(e) => setGenero(e.target.value as "H" | "M")}>
-                <option value="H">H</option>
-                <option value="M">M</option>
+                <option value="H">Hombre</option>
+                <option value="M">Mujer</option>
               </select>
             </div>
             <div>
               <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Talla</label>
               <select className={inputClass} value={talla} onChange={(e) => setTalla(e.target.value)}>
-                {["XS","S","M","L","XL","XXL"].map((t) => <option key={t} value={t}>{t}</option>)}
+                {TALLAS.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div className="col-span-2">
               <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Teléfono</label>
               <input className={inputClass} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+52 55 0000 0000" />
+            </div>
+            <div className="col-span-2 flex items-center gap-2">
+              <input type="checkbox" id="dealOwner" checked={dealOwner} onChange={(e) => setDealOwner(e.target.checked)} className="cursor-pointer" />
+              <label htmlFor="dealOwner" className="text-[13px] text-[var(--color-ink-2)] cursor-pointer">Deal Owner en HubSpot</label>
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-2">
@@ -218,14 +261,16 @@ function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; 
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
                 {[
-                  ["Email",      user.email],
-                  ["Teléfono",   user.phone],
-                  ["Hub",        hubLabel(user.hub)],
-                  ["Empresa",    user.empresa],
-                  ["Manager",    manager?.fullName ?? user.managerName ?? "—"],
-                  ["Ingreso",    user.hiredAt],
-                  ["Antigüedad", `${user.hireMonths} meses`],
-                  ["Talla",      user.talla],
+                  ["Email",        user.email],
+                  ["Teléfono",     user.phone],
+                  ["Área",         user.area ?? "—"],
+                  ["Hub o equipo", hubLabel(user.hub)],
+                  ["Empresa",      user.empresa],
+                  ["Jefe inmediato", manager?.fullName ?? user.managerName ?? "—"],
+                  ["Ingreso",      user.hiredAt],
+                  ["Antigüedad",   `${user.hireMonths} meses`],
+                  ["Talla",        user.talla],
+                  ["Deal Owner",   user.dealOwner ? "Sí" : "No"],
                 ].map(([label, value]) => (
                   <div key={label}>
                     <div className="text-[11px] text-[var(--color-ink-4)] mb-0.5">{label}</div>

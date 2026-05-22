@@ -88,7 +88,6 @@ function NewTicketModal({
           { state: "pending", title: "Ejecución",               when: "—" },
           { state: "pending", title: "Completado",              when: "—" },
         ],
-        id: "",
       });
       notify({ title: "Ticket creado", body: `Ticket de ${KIND_LABELS[kind]} iniciado correctamente.`, kind: "info" });
       onClose();

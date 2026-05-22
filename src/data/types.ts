@@ -39,6 +39,7 @@ export interface User {
   fullName: string;
   email: string;
   role: string;
+  area?: string;
   hub: string;
   quiosco: string;
   estado: string;
@@ -56,6 +57,7 @@ export interface User {
   access: string[];
   phone: string;
   hubspot: string | null;
+  dealOwner?: boolean;
 }
 
 // ── Recruiting ────────────────────────────────────────────────────────────
