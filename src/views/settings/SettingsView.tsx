@@ -101,10 +101,10 @@ function SettingsGeneral() {
           />
           <span className="text-[var(--color-ink-3)] self-center">Dominio corporativo</span>
           <span className="font-mono text-[12px] px-2 py-0.5 rounded bg-[var(--color-surface-2)] border border-[var(--color-line)] w-fit">
-            {wsData?.domain ?? "@avivacredito.com"}
+            {wsData?.domain ?? "—"}
           </span>
           <span className="text-[var(--color-ink-3)] self-center">Zona horaria</span>
-          <span className="text-[var(--color-ink-2)]">{timezone || "America/Mexico_City (GMT−6)"}</span>
+          <span className="text-[var(--color-ink-2)]">{timezone || "—"}</span>
         </div>
       </Section>
 
@@ -260,8 +260,8 @@ interface GmailSettings { connected: boolean; email: string; sentCount: number; 
 function SettingsGmail() {
   const { notify } = useNotif();
   const { data } = useDocument<GmailSettings>("settings", "gmail");
-  const connected = data?.connected ?? true;
-  const email     = data?.email     ?? "people@avivacredito.com";
+  const connected = data?.connected ?? false;
+  const email     = data?.email     ?? "";
 
   function handleDisconnect() {
     updateDocById("settings", "gmail", { connected: false, email: "" });
@@ -296,9 +296,9 @@ function SettingsGmail() {
       {connected && (
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: "Correos enviados (30d)", value: data?.sentCount ?? 312 },
-            { label: "Tasa de entrega",        value: `${data?.deliveryRate ?? 98.7}%` },
-            { label: "Rebotes",                value: data?.bounces ?? 4 },
+            { label: "Correos enviados (30d)", value: data?.sentCount  ?? "—" },
+            { label: "Tasa de entrega",        value: data?.deliveryRate != null ? `${data.deliveryRate}%` : "—" },
+            { label: "Rebotes",                value: data?.bounces     ?? "—" },
           ].map((s) => (
             <div key={s.label} className="px-4 py-3 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface-2)]">
               <div className="text-[11px] text-[var(--color-ink-4)] mb-1">{s.label}</div>
@@ -436,6 +436,7 @@ function SettingsLinkDuration() {
 function SettingsBranding() {
   const { notify } = useNotif();
   const { data } = useDocument<{ palette: Array<{ color: string; label: string }> }>("settings", "branding");
+  const { data: wsData } = useDocument<{ name: string }>("settings", "general");
   const palette = data?.palette ?? [];
 
   return (
@@ -443,7 +444,7 @@ function SettingsBranding() {
       <div className="flex items-center gap-4 mb-6">
         <div className="size-16 rounded-xl bg-[var(--color-mint-50)] text-green-700 grid place-items-center font-bold text-[22px] font-serif shrink-0">A</div>
         <div>
-          <div className="font-semibold text-[var(--color-ink)]">Aviva Crédito</div>
+          <div className="font-semibold text-[var(--color-ink)]">{wsData?.name ?? "—"}</div>
           <div className="text-[12px] text-[var(--color-ink-3)]">Logo cuadrado · 256×256 px</div>
           <div className="flex gap-2 mt-2">
             <Button size="sm" variant="secondary" onClick={() => notify({ title: "Próximamente", body: "La carga de logo se habilitará con Firebase Storage.", kind: "info" })}>Cambiar</Button>
