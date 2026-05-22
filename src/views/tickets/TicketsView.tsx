@@ -32,6 +32,13 @@ const KIND_LABELS: Record<TicketFormKind, string> = {
   access:      "Acceso especial",
 };
 
+const KIND_CONFIG: Record<TicketFormKind, { color: string; bg: string; icon: string }> = {
+  offboarding: { color: "var(--color-danger-fg)",  bg: "var(--color-danger-bg)", icon: "↓" },
+  suspend:     { color: "#8a5a00",                  bg: "#fff3d6",               icon: "⊘" },
+  transfer:    { color: "var(--color-green-700)",   bg: "var(--color-mint-50)",  icon: "⇄" },
+  access:      { color: "#1b3f8a",                  bg: "#e3eeff",               icon: "⊕" },
+};
+
 const REASONS_BY_KIND: Record<TicketFormKind, string[]> = {
   offboarding: ["Renuncia voluntaria", "Fin de contrato", "Despido", "Mutuo acuerdo", "Otro"],
   suspend:     ["Investigación interna", "Permiso sin goce", "Incapacidad médica", "Otro"],
@@ -76,9 +83,11 @@ function NewTicketModal({
         status: "in_progress",
         progress: 0,
         approvals: [
-          { role: "Manager directo",     who: "Pendiente", state: "pending" },
-          { role: "HR Business Partner", who: "Pendiente", state: "pending" },
-          ...(kind === "offboarding" || kind === "suspend"
+          { role: "Manager directo", who: "Pendiente", state: "pending" as const },
+          ...(kind !== "access"
+            ? [{ role: "HR Business Partner", who: "Pendiente", state: "pending" as const }]
+            : []),
+          ...(kind === "offboarding" || kind === "suspend" || kind === "access"
             ? [{ role: "IT / Sistemas", who: "Pendiente", state: "pending" as const }]
             : []),
         ],
@@ -164,10 +173,17 @@ function TicketDetail({
     finally { setLoading(false); }
   }
 
+  async function handleReject(role: string) {
+    setLoading(true);
+    try { await submitApproval({ ticketId: ticket.id, role, decision: "rejected" }); }
+    finally { setLoading(false); }
+  }
+
   const statusCfg = STATUS_CONFIG[ticket.status] ?? STATUS_CONFIG.in_progress;
+  const kindLabel = KIND_LABELS[ticket.kind as TicketFormKind] ?? ticket.kind;
 
   return (
-    <Drawer open onClose={onClose} title={`${ticket.kind === "offboarding" ? "Baja" : "Ticket"} · ${userName}`} subtitle={`${ticket.id} · ${ticket.reason}`}>
+    <Drawer open onClose={onClose} title={`${kindLabel} · ${userName}`} subtitle={`${ticket.id} · ${ticket.reason}`}>
       <div className="px-6 py-5 space-y-6">
         {/* Progress */}
         <div>
@@ -186,10 +202,10 @@ function TicketDetail({
         <div className="grid grid-cols-2 gap-3 text-[13px]">
           {[
             ["Motivo", ticket.reason],
-            ["Última jornada", ticket.lastDay],
+            ticket.kind === "offboarding" ? ["Última jornada", ticket.lastDay] : null,
             ["Creado por", ticket.createdBy],
             ["Fecha", ticket.createdAt],
-          ].map(([label, value]) => (
+          ].filter(Boolean).map(([label, value]) => (
             <div key={label}>
               <div className="text-[11px] text-[var(--color-ink-4)] mb-0.5">{label}</div>
               <div className="font-medium text-[var(--color-ink-2)]">{value}</div>
@@ -213,12 +229,17 @@ function TicketDetail({
                   <span className="flex items-center gap-1 text-green-600 text-[12px] font-medium">
                     <Check size={13} /> Aprobado
                   </span>
-                ) : a.state === "pending" ? (
-                  <Button size="sm" variant="primary" onClick={() => handleApprove(a.role)} disabled={loading}>
-                    Aprobar
-                  </Button>
+                ) : a.state === "rejected" ? (
+                  <span className="text-[var(--color-danger-fg)] text-[12px] font-medium">Rechazado</span>
                 ) : (
-                  <span className="text-[var(--color-danger-fg)] text-[12px]">Rechazado</span>
+                  <div className="flex gap-1.5">
+                    <Button size="sm" variant="danger" onClick={() => handleReject(a.role)} disabled={loading}>
+                      Rechazar
+                    </Button>
+                    <Button size="sm" variant="primary" onClick={() => handleApprove(a.role)} disabled={loading}>
+                      Aprobar
+                    </Button>
+                  </div>
                 )}
               </div>
             ))}
@@ -294,8 +315,8 @@ export function TicketsView() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="font-serif text-[22px] font-medium text-[var(--color-ink)]">Bajas</h1>
-          <p className="text-[12.5px] text-[var(--color-ink-3)]">Tickets de baja, suspensión y transferencia.</p>
+          <h1 className="font-serif text-[22px] font-medium text-[var(--color-ink)]">Tickets</h1>
+          <p className="text-[12.5px] text-[var(--color-ink-3)]">Bajas, suspensiones, transferencias y accesos especiales.</p>
         </div>
         <Button variant="primary" icon={<Plus size={14} />} onClick={() => setChooser(true)}>Nuevo ticket</Button>
       </div>
@@ -325,11 +346,15 @@ export function TicketsView() {
           return (
             <div key={t.id} onClick={() => setSelected(t)}
               className="flex items-center gap-4 px-5 py-4 rounded-[var(--radius)] bg-[var(--color-surface)] border border-[var(--color-line)] shadow-[var(--shadow-sm)] cursor-pointer hover:bg-[var(--color-surface-2)] transition-colors group">
-              <div className="size-10 rounded-[var(--radius-sm)] grid place-items-center shrink-0"
-                style={{ background: t.kind === "offboarding" ? "var(--color-danger-bg)" : "var(--color-mint-50)",
-                         color: t.kind === "offboarding" ? "var(--color-danger-fg)" : "var(--color-green-700)" }}>
-                {t.kind === "offboarding" ? "↓" : "+"}
-              </div>
+              {(() => {
+                const kc = KIND_CONFIG[t.kind as TicketFormKind] ?? KIND_CONFIG.offboarding;
+                return (
+                  <div className="size-10 rounded-[var(--radius-sm)] grid place-items-center text-[18px] font-bold shrink-0"
+                    style={{ background: kc.bg, color: kc.color }}>
+                    {kc.icon}
+                  </div>
+                );
+              })()}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
                   <span className="font-mono text-[11.5px] text-[var(--color-ink-4)]">{t.id}</span>
@@ -338,9 +363,11 @@ export function TicketsView() {
                   </span>
                 </div>
                 <div className="font-medium text-[var(--color-ink)] text-[14px]">
-                  {t.kind === "offboarding" ? "Baja" : "Alta"} de {name}
+                  {KIND_LABELS[t.kind as TicketFormKind] ?? t.kind} · {name}
                 </div>
-                <div className="text-[12px] text-[var(--color-ink-3)] mt-0.5">{t.reason} · Última jornada {t.lastDay}</div>
+                <div className="text-[12px] text-[var(--color-ink-3)] mt-0.5">
+                  {t.reason}{t.kind === "offboarding" ? ` · Última jornada ${t.lastDay}` : ""}
+                </div>
               </div>
               <div className="flex items-center gap-4 shrink-0">
                 <div className="text-right">

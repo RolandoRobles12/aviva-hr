@@ -4,6 +4,25 @@ import { LoadingView, ErrorView } from "@/components/ui/Spinner";
 import { Button } from "@/components/ui/Button";
 import { Search, Download } from "@/components/icons";
 
+function exportToCSV(rows: ReturnType<typeof useAuditLog>["data"]) {
+  const headers = ["Fecha", "Actor", "Acción", "Objetivo", "ID Objetivo", "Fuente"];
+  const data = rows.map((e) => [
+    e.when,
+    e.actor ?? "Sistema",
+    e.action,
+    e.target,
+    e.targetId ?? "",
+    e.source,
+  ]);
+  const csv = [headers, ...data]
+    .map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" }));
+  a.download = `audit-aviva-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+}
+
 export function AuditView() {
   const { data: events, loading, error } = useAuditLog();
   const [query, setQuery]   = useState("");
@@ -35,7 +54,7 @@ export function AuditView() {
           <h1 className="font-serif text-[22px] font-medium text-[var(--color-ink)]">Auditoría</h1>
           <p className="text-[12.5px] text-[var(--color-ink-3)]">Registro inmutable de cambios en personas, accesos y configuraciones.</p>
         </div>
-        <Button variant="secondary" size="sm" icon={<Download size={13} />}>Exportar log</Button>
+        <Button variant="secondary" size="sm" icon={<Download size={13} />} onClick={() => exportToCSV(filtered)}>Exportar log</Button>
       </div>
 
       {/* Filters */}
