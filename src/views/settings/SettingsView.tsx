@@ -529,7 +529,7 @@ function RoleModal({
 }
 
 function SettingsRoles() {
-  const { data: roles } = useCollection<{ name: string; desc: string; color: string; members: number }>("roles");
+  const { data: roles } = useCollection<{ name: string; desc: string; color: string; level: string; members: number }>("roles");
   const [editing, setEditing] = useState<RoleDoc | null | "new">(null);
 
   async function handleSave(data: { name: string; desc: string; color: string }) {
@@ -541,32 +541,48 @@ function SettingsRoles() {
     setEditing(null);
   }
 
+  async function handleDelete(id: string, name: string) {
+    if (!confirm(`¿Eliminar el rol "${name}"? Las personas asignadas a este rol perderán sus permisos.`)) return;
+    await deleteDocById("roles", id);
+  }
+
   return (
     <>
-      <Section title={`Roles (${roles.length})`} sub="Cada persona pertenece a uno o varios roles. Los permisos se acumulan." action={
+      <div className="flex items-start gap-3 px-4 py-3 mb-4 rounded-[var(--radius-sm)] bg-[var(--color-surface-2)] border border-[var(--color-line)] text-[13px] text-[var(--color-ink-3)]">
+        <Shield size={15} className="text-[var(--color-ink-4)] shrink-0 mt-0.5" />
+        <span>
+          Estos roles controlan <strong className="text-[var(--color-ink-2)]">quién puede usar Aviva HR</strong> y qué acciones puede ejecutar.
+          Son distintos a los puestos del directorio (esos se gestionan en <strong className="text-[var(--color-ink-2)]">Catálogo → Puestos</strong>).
+        </span>
+      </div>
+
+      <Section title={`Roles de acceso (${roles.length})`} sub="HR, Legal, Nómina, Managers y Directivos con acceso a la herramienta." action={
         <Button size="sm" variant="primary" icon={<Plus size={13} />} onClick={() => setEditing("new")}>Nuevo rol</Button>
       }>
         <div className="grid grid-cols-2 gap-3">
           {roles.map((r) => (
-            <div key={r.id} className="flex items-center gap-3 p-4 rounded-[var(--radius-sm)] border border-[var(--color-line)]" style={{ borderLeft: `3px solid ${r.color}` }}>
-              <div className="size-10 rounded-lg grid place-items-center text-[16px] font-bold shrink-0" style={{ background: r.color + "18", color: r.color }}>
+            <div key={r.id} className="flex items-start gap-3 p-4 rounded-[var(--radius-sm)] border border-[var(--color-line)]" style={{ borderLeft: `3px solid ${r.color}` }}>
+              <div className="size-9 rounded-lg grid place-items-center text-[14px] font-bold shrink-0 mt-0.5" style={{ background: r.color + "18", color: r.color }}>
                 {r.name[0]}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-semibold text-[13.5px] text-[var(--color-ink)]">{r.name}</div>
-                <div className="text-[12px] text-[var(--color-ink-3)]">{r.desc}</div>
-                <div className="text-[11.5px] text-[var(--color-ink-4)] mt-0.5">{r.members} personas</div>
+                <div className="text-[12px] text-[var(--color-ink-3)] mt-0.5">{r.desc}</div>
+                {r.level && (
+                  <span className="inline-block mt-1.5 text-[11px] font-medium px-1.5 py-0.5 rounded" style={{ background: r.color + "18", color: r.color }}>
+                    {r.level}
+                  </span>
+                )}
               </div>
-              <Button size="sm" variant="secondary" onClick={() => setEditing(r as RoleDoc)}>Editar</Button>
+              <div className="flex gap-1 shrink-0">
+                <Button size="sm" variant="ghost" onClick={() => setEditing(r as RoleDoc)}>Editar</Button>
+                <Button size="sm" variant="danger" onClick={() => handleDelete(r.id, r.name)}>✕</Button>
+              </div>
             </div>
           ))}
-        </div>
-      </Section>
-
-      <Section title="Matriz de permisos" sub="">
-        <div className="flex items-center gap-3 px-4 py-3 rounded-[var(--radius-sm)] bg-[var(--color-surface-2)] border border-[var(--color-line)] text-[13px] text-[var(--color-ink-3)]">
-          <Shield size={16} className="text-[var(--color-ink-4)] shrink-0" />
-          La matriz de permisos completa estará disponible en la próxima versión.
+          {roles.length === 0 && (
+            <div className="col-span-2 py-8 text-center text-[13px] text-[var(--color-ink-4)]">Sin roles configurados. Crea el primero.</div>
+          )}
         </div>
       </Section>
 

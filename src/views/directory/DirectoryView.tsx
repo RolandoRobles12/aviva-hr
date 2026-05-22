@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useUsers } from "@/hooks/useUsers";
 import { useIntegrations } from "@/hooks/useIntegrations";
 import { updateUser, createUser } from "@/services/users";
+import { useCollection } from "@/hooks/useFirestore";
 import { useCatalog } from "@/context/CatalogContext";
 import { useNotif } from "@/context/NotifContext";
 import type { User } from "@/data/types";
@@ -22,6 +23,7 @@ import { cn } from "@/lib/cn";
 function NewUserModal({ onClose }: { onClose: () => void }) {
   const { hubs, estados } = useCatalog();
   const { notify } = useNotif();
+  const { data: positions } = useCollection<{ name: string }>("catalog/positions/items");
   const [saving, setSaving] = useState(false);
 
   const [numColaborador, setNumColaborador] = useState("");
@@ -56,7 +58,6 @@ function NewUserModal({ onClose }: { onClose: () => void }) {
         status: "invited",
         laptop: null, tablets: [], access: [],
         hubspot: null,
-        id: "",
       });
       notify({ title: "Alta creada", body: `${first} ${last} · Invitación pendiente.`, kind: "onboard" });
       onClose();
@@ -96,8 +97,11 @@ function NewUserModal({ onClose }: { onClose: () => void }) {
               <input className={inputClass} required value={last} onChange={(e) => setLast(e.target.value)} placeholder="García López" />
             </div>
             <div className="col-span-2">
-              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Puesto / Role *</label>
-              <input className={inputClass} required value={role} onChange={(e) => setRole(e.target.value)} placeholder="Ej. Promotor de campo" />
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Puesto *</label>
+              <select className={inputClass} required value={role} onChange={(e) => setRole(e.target.value)}>
+                <option value="">Seleccionar puesto…</option>
+                {positions.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
+              </select>
             </div>
             <div>
               <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Hub</label>

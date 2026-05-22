@@ -32,8 +32,10 @@ const hubs = [
 const puestos = [
   "Promotor/a Aviva tu Compra", "Promotor Aviva tu Casa", "Promotor Aviva tu Negocio",
   "Promotor Casa Marchand", "Promotor Aviva tu Compra · BA", "Promotor Aviva tu Compra · Walmart",
-  "Promotor BA Externo", "Kiosk Manager", "Growth Hub Manager", "Phygital Expansion Manager",
-  "Sales Operations Manager", "Especialista de Expansión", "Retención",
+  "Promotor BA Externo", "Externos - Aviva tu Compra",
+  "Kiosk Manager", "Growth Hub Manager", "Phygital Expansion Manager",
+  "Sales Operations Manager", "Head of Sales", "Sales VP", "Chief of Growth",
+  "Especialista de Expansión", "Retención",
   "Graduate Program Associate", "Jr Product Associate", "Product Designer", "BI",
 ];
 
@@ -461,10 +463,26 @@ const catalogProducts = [
 
 const catalogPositions = [
   { id: "pos-001", name: "Promotor/a Aviva tu Compra",     level: "operativo", department: "Kiosk Acquisitions", headcount: 180, updatedAt: "2026-05-01" },
-  { id: "pos-002", name: "Kiosk Manager",                  level: "manager",   department: "Kiosk Acquisitions", headcount: 22,  updatedAt: "2026-04-01" },
-  { id: "pos-003", name: "Growth Hub Manager",             level: "senior",    department: "Kiosk Acquisitions", headcount: 8,   updatedAt: "2026-04-01" },
-  { id: "pos-004", name: "Product Designer",               level: "senior",    department: "Growth",             headcount: 2,   updatedAt: "2026-03-01" },
-  { id: "pos-005", name: "Graduate Program Associate",     level: "junior",    department: "Growth",             headcount: 4,   updatedAt: "2026-03-01" },
+  { id: "pos-002", name: "Promotor Aviva tu Casa",         level: "operativo", department: "Kiosk Acquisitions", headcount: 20,  updatedAt: "2026-05-01" },
+  { id: "pos-003", name: "Promotor Aviva tu Negocio",      level: "operativo", department: "Kiosk Acquisitions", headcount: 15,  updatedAt: "2026-05-01" },
+  { id: "pos-004", name: "Promotor Casa Marchand",         level: "operativo", department: "Kiosk Acquisitions", headcount: 18,  updatedAt: "2026-05-01" },
+  { id: "pos-005", name: "Promotor Aviva tu Compra · BA",  level: "operativo", department: "Kiosk Acquisitions", headcount: 12,  updatedAt: "2026-05-01" },
+  { id: "pos-006", name: "Promotor Aviva tu Compra · Walmart", level: "operativo", department: "Kiosk Acquisitions", headcount: 8, updatedAt: "2026-05-01" },
+  { id: "pos-007", name: "Promotor BA Externo",            level: "operativo", department: "Kiosk Acquisitions", headcount: 10,  updatedAt: "2026-05-01" },
+  { id: "pos-008", name: "Externos - Aviva tu Compra",     level: "operativo", department: "Kiosk Acquisitions", headcount: 6,   updatedAt: "2026-05-01" },
+  { id: "pos-009", name: "Kiosk Manager",                  level: "manager",   department: "Kiosk Acquisitions", headcount: 22,  updatedAt: "2026-04-01" },
+  { id: "pos-010", name: "Growth Hub Manager",             level: "senior",    department: "Kiosk Acquisitions", headcount: 8,   updatedAt: "2026-04-01" },
+  { id: "pos-011", name: "Phygital Expansion Manager",     level: "senior",    department: "Growth",             headcount: 3,   updatedAt: "2026-04-01" },
+  { id: "pos-012", name: "Sales Operations Manager",       level: "manager",   department: "Sales",              headcount: 2,   updatedAt: "2026-04-01" },
+  { id: "pos-013", name: "Head of Sales",                  level: "director",  department: "Sales",              headcount: 1,   updatedAt: "2026-05-01" },
+  { id: "pos-014", name: "Sales VP",                       level: "vp",        department: "Sales",              headcount: 1,   updatedAt: "2026-05-01" },
+  { id: "pos-015", name: "Chief of Growth",                level: "clevel",    department: "Growth",             headcount: 1,   updatedAt: "2026-05-01" },
+  { id: "pos-016", name: "Especialista de Expansión",      level: "senior",    department: "Growth",             headcount: 4,   updatedAt: "2026-04-01" },
+  { id: "pos-017", name: "Retención",                      level: "operativo", department: "Kiosk Acquisitions", headcount: 5,   updatedAt: "2026-04-01" },
+  { id: "pos-018", name: "Graduate Program Associate",     level: "junior",    department: "Growth",             headcount: 4,   updatedAt: "2026-03-01" },
+  { id: "pos-019", name: "Jr Product Associate",           level: "junior",    department: "Growth",             headcount: 3,   updatedAt: "2026-03-01" },
+  { id: "pos-020", name: "Product Designer",               level: "senior",    department: "Growth",             headcount: 2,   updatedAt: "2026-03-01" },
+  { id: "pos-021", name: "BI",                             level: "senior",    department: "Growth",             headcount: 2,   updatedAt: "2026-03-01" },
 ];
 
 const appSettings = {
@@ -579,10 +597,16 @@ async function seed() {
   ]};
 
   const rolesData = [
-    { id: "r-hr",    name: "HR Business Partner", desc: "Gestión completa de personas",        color: "#16b877", members: 3 },
-    { id: "r-it",    name: "IT / Sistemas",         desc: "Acceso a apps y equipamiento",        color: "#1b3f8a", members: 2 },
-    { id: "r-mgr",   name: "Manager",               desc: "Revisión y aprobación de su equipo",  color: "#5c2e8e", members: 8 },
-    { id: "r-admin", name: "Administrador",          desc: "Acceso total",                        color: "#026149", members: 1 },
+    { id: "r-admin",   name: "Administrador",          desc: "Acceso total a la plataforma. Configura integraciones, roles y ajustes.",      level: "Acceso completo",  color: "#026149", members: 1 },
+    { id: "r-people",  name: "People Ops Manager",     desc: "Crea y gestiona el ciclo completo: altas, bajas, candidatos y documentos.",    level: "Acceso completo",  color: "#16b877", members: 2 },
+    { id: "r-hr",      name: "HR Business Partner",    desc: "Aprueba tickets, revisa expedientes y gestiona el equipo asignado.",           level: "Gestión",          color: "#1b8a5a", members: 4 },
+    { id: "r-legal",   name: "Legal",                  desc: "Acceso a contratos, finiquitos y log de auditoría. Solo lectura en directorio.", level: "Lectura + Legal", color: "#5c2e8e", members: 2 },
+    { id: "r-nomina",  name: "Nómina",                 desc: "Acceso a datos bancarios, tallas y documentos de nómina. Sin acceso a tickets.", level: "Lectura",        color: "#8a5a00", members: 2 },
+    { id: "r-mgr",     name: "Manager",                desc: "Ve su equipo directo, inicia tickets de baja y aprueba accesos.",               level: "Aprobaciones",    color: "#1b3f8a", members: 12 },
+    { id: "r-head",    name: "Head of Area",           desc: "Vista de toda su área. Puede ver reportes y aprobar tickets de nivel gerencia.", level: "Reportes",       color: "#a8200d", members: 5 },
+    { id: "r-clevel",  name: "C-Level",                desc: "Vista ejecutiva de headcount, bajas y KPIs. Sin acceso a datos sensibles.",     level: "Solo lectura",    color: "#3a3a3a", members: 3 },
+    { id: "r-it",      name: "IT / Sistemas",          desc: "Gestiona accesos, revoca credenciales y ejecuta tareas de offboarding técnico.", level: "Acceso técnico", color: "#0066cc", members: 2 },
+    { id: "r-recruiter", name: "Reclutador",           desc: "Crea y gestiona candidatos. Sin acceso al directorio de colaboradores activos.", level: "Candidatos",     color: "#611f69", members: 4 },
   ];
 
   const apiKeysData = [
