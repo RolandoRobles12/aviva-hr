@@ -24,6 +24,7 @@ function NewUserModal({ onClose }: { onClose: () => void }) {
   const { hubs, estados } = useCatalog();
   const { notify } = useNotif();
   const { data: positions } = useCollection<{ name: string }>("catalog/positions/items");
+  const { data: quioscos } = useCollection<{ name: string }>("catalog/quioscos/items");
   const [saving, setSaving] = useState(false);
 
   const [numColaborador, setNumColaborador] = useState("");
@@ -119,11 +120,18 @@ function NewUserModal({ onClose }: { onClose: () => void }) {
             </div>
             <div>
               <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Quiósco</label>
-              <input className={inputClass} value={quiosco} onChange={(e) => setQuiosco(e.target.value)} placeholder="Nombre del quiósco" />
+              <select className={inputClass} value={quiosco} onChange={(e) => setQuiosco(e.target.value)}>
+                <option value="">Sin asignar</option>
+                {quioscos.map((q) => <option key={q.id} value={q.name}>{q.name}</option>)}
+              </select>
             </div>
             <div>
               <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Empresa</label>
-              <input className={inputClass} value={empresa} onChange={(e) => setEmpresa(e.target.value)} />
+              <select className={inputClass} value={empresa} onChange={(e) => setEmpresa(e.target.value)}>
+                <option value="Aviva Crédito">Aviva Crédito</option>
+                <option value="Aviva Financial">Aviva Financial</option>
+                <option value="Ejecutando Ideas">Ejecutando Ideas</option>
+              </select>
             </div>
             <div>
               <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Género</label>

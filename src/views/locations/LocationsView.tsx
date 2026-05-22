@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useLocations, type Location } from "@/hooks/useLocations";
-import { createDoc, updateDocById, deleteDocById } from "@/hooks/useFirestore";
+import { createDoc, updateDocById, deleteDocById, useCollection } from "@/hooks/useFirestore";
+import { useUsers } from "@/hooks/useUsers";
 import { LoadingView, ErrorView } from "@/components/ui/Spinner";
 import { Button } from "@/components/ui/Button";
 import { Drawer } from "@/components/ui/Drawer";
@@ -38,6 +39,8 @@ function LocationModal({
 }) {
   const { estados } = useCatalog();
   const { notify } = useNotif();
+  const { data: hubItems } = useCollection<{ label: string }>("catalog/hubs/items");
+  const { data: allUsers } = useUsers();
   const isNew = loc === "new";
   const existing = isNew ? null : loc;
 
@@ -128,11 +131,21 @@ function LocationModal({
             </div>
             <div>
               <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Gerente</label>
-              <input className={inputClass} value={gerente} onChange={(e) => setGerente(e.target.value)} placeholder="Nombre del gerente" />
+              <select className={inputClass} value={gerente} onChange={(e) => setGerente(e.target.value)}>
+                <option value="">Sin asignar</option>
+                {allUsers.map((u) => (
+                  <option key={u.id} value={u.fullName}>{u.fullName}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Hub</label>
-              <input className={inputClass} value={hub} onChange={(e) => setHub(e.target.value)} placeholder="ID del hub" />
+              <select className={inputClass} value={hub} onChange={(e) => setHub(e.target.value)}>
+                <option value="">Sin asignar</option>
+                {hubItems.map((h) => (
+                  <option key={h.id} value={h.label}>{h.label}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Estatus</label>
