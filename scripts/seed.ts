@@ -297,16 +297,6 @@ const users = [
     laptop: null, tablets: ["TAB-201"], access: ["google","slack","avivaflat"],
     phone: "+52 771 345 6789", hubspot: null,
   },
-  {
-    id: "u-8_02", numColaborador: "8_02",
-    first: "Maria Renee", last: "Leon Castro", fullName: "Maria Renee Leon Castro",
-    email: "mariarenee@avivacredito.com", role: "Jr Product Associate",
-    area: "Growth", hub: "corporativo", quiosco: "Aviva House", estado: "CDMX", empresa: "Aviva Financial",
-    genero: "M", talla: "CH", manager: null, managerName: "Amran Frey", dealOwner: true,
-    avatar: { initials: "ML", color: "c2" }, hiredAt: "2022-10-04", hireMonths: 43, status: "active",
-    laptop: null, tablets: [], access: ["google","slack","hubspot","okta"],
-    phone: "", hubspot: "239992681",
-  },
 ];
 
 const tickets = [

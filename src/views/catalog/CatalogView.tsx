@@ -96,6 +96,7 @@ function ProductModal({ prod, onClose }: { prod: (Product & { id: string }) | "n
 function PositionModal({ pos, onClose }: { pos: (Position & { id: string }) | "new"; onClose: () => void }) {
   const isNew = pos === "new";
   const existing = isNew ? null : pos;
+  const { data: products } = useCollection<Product>("catalog/products/items");
   const [name,      setName]      = useState(existing?.name      ?? "");
   const [level,     setLevel]     = useState(existing?.level     ?? "operativo");
   const [area,      setArea]      = useState(existing?.area      ?? "");
@@ -134,6 +135,13 @@ function PositionModal({ pos, onClose }: { pos: (Position & { id: string }) | "n
               {AREAS.map((a) => <option key={a} value={a}>{a}</option>)}
             </select>
           </div>
+        </div>
+        <div>
+          <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Producto (opcional)</label>
+          <select className={inputClass} value={productId ?? ""} onChange={(e) => setProductId(e.target.value)}>
+            <option value="">Sin producto asociado</option>
+            {products.map((p) => <option key={p.id} value={p.id!}>{p.name}</option>)}
+          </select>
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="secondary" size="sm" onClick={onClose}>Cancelar</Button>
