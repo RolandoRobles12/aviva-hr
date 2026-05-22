@@ -4,21 +4,25 @@ import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { createDoc } from "@/hooks/useFirestore";
 
+// Columns match the exact headers used in the Aviva Sheets directory export.
+// "Antigüedad" and "Descripción" are intentionally omitted — calculated/unused.
 const TARGETS = [
-  { id: "numColaborador", label: "Número de colaborador", required: true,  hints: ["No de colaborador", "Número", "ID", "Numero colaborador"] },
-  { id: "fullName",       label: "Nombre completo",       required: true,  hints: ["Nombre completo", "Nombre", "Colaborador"] },
-  { id: "email",          label: "Correo corporativo",    required: true,  hints: ["Correo", "Email", "E-mail"] },
-  { id: "role",           label: "Puesto",                required: true,  hints: ["Puesto", "Cargo", "Rol"] },
-  { id: "hub",            label: "Hub / equipo",          required: false, hints: ["Hub", "Equipo"] },
-  { id: "quiosco",        label: "Quiósco",               required: true,  hints: ["Quiosco", "Quiósco", "Kiosco"] },
-  { id: "estado",         label: "Estado",                required: true,  hints: ["Estado"] },
-  { id: "managerName",    label: "Jefe inmediato",        required: false, hints: ["Jefe inmediato", "Jefe", "Manager", "Supervisor"] },
-  { id: "empresa",        label: "Empresa",               required: false, hints: ["Empresa", "Razón social"] },
-  { id: "talla",          label: "Talla de uniforme",     required: false, hints: ["Talla", "Tallas"] },
-  { id: "genero",         label: "Género",                required: false, hints: ["Hombre/Mujer", "Género", "Genero", "Sexo"] },
-  { id: "hiredAt",        label: "Fecha de ingreso",      required: false, hints: ["Fecha de Ingreso", "Fecha ingreso", "Alta"] },
-  { id: "hubspot",        label: "HubSpot ID",            required: false, hints: ["HubSpot", "HubSpot ID"] },
-  { id: "phone",          label: "Teléfono / WhatsApp",   required: false, hints: ["Teléfono", "WhatsApp", "Celular", "Tel"] },
+  { id: "empresa",        label: "Empresa",              required: true,  hints: ["Empresa"] },
+  { id: "hub",            label: "Hub o equipo",         required: false, hints: ["Hub o equipo", "Hub equipo", "Equipo"] },
+  { id: "quiosco",        label: "Quiósco",              required: false, hints: ["Quiosco", "Quiósco", "Kiosco"] },
+  { id: "estado",         label: "Estado",               required: false, hints: ["Estado"] },
+  { id: "fullName",       label: "Nombre completo",      required: true,  hints: ["Nombre completo", "Nombre y apellidos"] },
+  { id: "numColaborador", label: "No de colaborador",    required: true,  hints: ["No de colaborador", "Número colaborador", "Num colaborador"] },
+  { id: "role",           label: "Puesto",               required: true,  hints: ["Puesto", "Cargo"] },
+  { id: "hiredAt",        label: "Fecha de ingreso",     required: false, hints: ["Fecha de Ingreso", "Fecha ingreso"] },
+  { id: "dealOwner",      label: "Deal Owner",           required: false, hints: ["Deal Owner", "Deal owner"] },
+  { id: "genero",         label: "Hombre/Mujer",         required: false, hints: ["Hombre/Mujer", "Género", "Genero"] },
+  { id: "talla",          label: "Tallas",               required: false, hints: ["Tallas", "Talla"] },
+  { id: "email",          label: "Correo",               required: true,  hints: ["Correo", "Email", "E-mail"] },
+  { id: "area",           label: "Área",                 required: false, hints: ["Área", "Area"] },
+  { id: "managerName",    label: "Jefe Inmediato",       required: false, hints: ["Jefe Inmediato", "Jefe inmediato", "Supervisor"] },
+  { id: "hubspot",        label: "HubSpot ID",           required: false, hints: ["HubSpot ID", "Hubspot ID"] },
+  { id: "phone",          label: "Teléfono",             required: false, hints: ["Teléfono", "WhatsApp", "Celular"] },
 ] as const;
 
 type TargetId = (typeof TARGETS)[number]["id"];
@@ -48,10 +52,8 @@ function parseCSV(text: string): string[][] {
 }
 
 function downloadTemplate() {
-  const csv = [
-    "No de colaborador,Nombre completo,Correo,Puesto,Hub o equipo,Quiosco,Estado,Jefe inmediato,Empresa,Talla,Hombre/Mujer,Fecha de Ingreso,HubSpot ID,WhatsApp",
-    "385_02,Ejemplo Pérez García,ejemplo.perez@avivacredito.com,Promotor/a Aviva tu Compra,hub3,Texmelucan,Puebla,Fernanda Romero,Aviva Financial,M,M,2026-06-01,,+52 55 1234 5678",
-  ].join("\n");
+  // Headers match the Aviva directory Google Sheets export column order exactly.
+  const csv = "Empresa,Hub o equipo,Quiosco,Estado,Nombre completo,No de colaborador,Puesto,Fecha de Ingreso,Antigüedad,Deal Owner,Hombre/Mujer,Tallas,Correo,Descripción,Área,Jefe Inmediato,HubSpot ID";
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
   a.download = "plantilla-colaboradores-aviva.csv";
@@ -127,31 +129,37 @@ export function ImportWizard({ onClose, onImported }: Props) {
     try {
       const toImport = validation.rows.filter(r => r.sev !== "err");
       await Promise.all(
-        toImport.map(row =>
-          createDoc("users", {
+        toImport.map(row => {
+          const name = (row.mapped.fullName ?? "").trim();
+          const parts = name.split(" ");
+          return createDoc("users", {
             numColaborador: row.mapped.numColaborador ?? "",
-            fullName:       row.mapped.fullName       ?? "",
-            email:          row.mapped.email          ?? "",
-            role:           row.mapped.role           ?? "",
-            hub:            row.mapped.hub            ?? "",
-            quiosco:        row.mapped.quiosco        ?? "",
-            estado:         row.mapped.estado         ?? "",
-            managerName:    row.mapped.managerName    ?? "",
-            empresa:        row.mapped.empresa        ?? "Aviva Financial",
-            talla:          row.mapped.talla          ?? "M",
-            genero:         row.mapped.genero         ?? "M",
-            hiredAt:        row.mapped.hiredAt        ?? new Date().toISOString().slice(0,10),
-            phone:          row.mapped.phone          ?? "",
-            hubspot:        row.mapped.hubspot        ?? "",
+            fullName:       name,
+            first:          parts[0] ?? "",
+            last:           parts.slice(1).join(" "),
+            email:          row.mapped.email        ?? "",
+            role:           row.mapped.role         ?? "",
+            empresa:        row.mapped.empresa      ?? "",
+            hub:            row.mapped.hub          ?? "",
+            quiosco:        row.mapped.quiosco      ?? "",
+            estado:         row.mapped.estado       ?? "",
+            area:           row.mapped.area         ?? "",
+            managerName:    row.mapped.managerName  ?? null,
+            manager:        null,
+            hiredAt:        row.mapped.hiredAt      ?? new Date().toISOString().slice(0, 10),
+            dealOwner:      (row.mapped.dealOwner ?? "").toUpperCase() === "TRUE",
+            genero:         (row.mapped.genero ?? "") as "H" | "M",
+            talla:          row.mapped.talla        ?? "",
+            phone:          row.mapped.phone        ?? "",
+            hubspot:        row.mapped.hubspot      || null,
             status:         "invited",
             access:         [],
             tablets:        [],
+            laptop:         null,
             hireMonths:     0,
-            avatar:         { initials: (row.mapped.fullName ?? "?")[0].toUpperCase(), color: "c1" },
-            first:          (row.mapped.fullName ?? "").split(" ")[0],
-            last:           (row.mapped.fullName ?? "").split(" ").slice(1).join(" "),
-          })
-        )
+            avatar:         { initials: (name[0] ?? "?").toUpperCase(), color: "c1" },
+          });
+        })
       );
       onImported?.({ ok: validation.ok, warn: validation.warn, err: validation.err, total: validation.total });
       setStep(3);
