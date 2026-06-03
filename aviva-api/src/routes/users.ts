@@ -172,4 +172,59 @@ router.patch("/:id", authenticate, requireScope("users:write"), async (req, res)
   }
 });
 
+// ── POST /users/:id/offboard ───────────────────────────────────────────────────
+router.post("/:id/offboard", authenticate, requireScope("users:delete"), async (req, res) => {
+  try {
+    const userRef = db.collection("users").doc(req.params.id);
+    const userDoc = await userRef.get();
+
+    if (!userDoc.exists) {
+      notFound(res, `Colaborador "${req.params.id}" no encontrado.`);
+      return;
+    }
+
+    const { reason, last_day, transfer_to, notes } = req.body ?? {};
+
+    if (!reason || !last_day) {
+      badRequest(res, "Campos requeridos: reason, last_day.");
+      return;
+    }
+
+    const now              = new Date().toISOString();
+    const pending_approvals = ["Manager directo", "HR Business Partner"];
+
+    const ticketRef = await db.collection("tickets").add({
+      type:               "offboarding",
+      user:               { id: req.params.id, nombre: userDoc.data()?.nombre ?? userDoc.data()?.fullName },
+      reason,
+      last_day,
+      transfer_to:        transfer_to ?? null,
+      notes:              notes       ?? null,
+      status:             "pending_approval",
+      pending_approvals,
+      tasks:              { total: 0, done: 0, failed: 0 },
+      created_by:         req.apiKey!.author,
+      createdAt:          now,
+    });
+
+    await db.collection("auditLog").add({
+      action:      "offboarding_created",
+      actor:       { id: req.apiKey!.id, name: req.apiKey!.author },
+      target:      { id: req.params.id, nombre: userDoc.data()?.nombre ?? userDoc.data()?.fullName },
+      ticket_id:   ticketRef.id,
+      source:      "api",
+      occurred_at: now,
+    });
+
+    res.status(201).json({
+      ticket_id:          ticketRef.id,
+      user_id:            req.params.id,
+      status:             "pending_approval",
+      pending_approvals,
+    });
+  } catch (err) {
+    serverError(res, err);
+  }
+});
+
 export default router;
