@@ -775,9 +775,20 @@ function NewApiKeyModal({ onClose }: { onClose: () => void }) {
   async function generate() {
     if (!name.trim()) return;
     setSaving(true);
-    const prefix = "ak_live_" + Math.random().toString(36).slice(2, 6);
-    await createDoc("apiKeys", { name, prefix, scopes, lastUsed: "nunca", status: "ok", author: "Tú" });
-    setGenerated(prefix + "_•••••••••••••••••••••");
+
+    // Genera key real: ak_live_XXXX_<48 hex chars>
+    const prefix  = "ak_live_" + Math.random().toString(36).slice(2, 6);
+    const secret  = Array.from(crypto.getRandomValues(new Uint8Array(24)))
+      .map(b => b.toString(16).padStart(2, "0")).join("");
+    const fullKey = `${prefix}_${secret}`;
+
+    // SHA-256 del token completo — lo que el middleware valida
+    const hashBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(fullKey));
+    const keyHash    = Array.from(new Uint8Array(hashBuffer))
+      .map(b => b.toString(16).padStart(2, "0")).join("");
+
+    await createDoc("apiKeys", { name, prefix, scopes, lastUsed: "nunca", status: "ok", author: "Tú", keyHash });
+    setGenerated(fullKey);
     setSaving(false);
   }
 
