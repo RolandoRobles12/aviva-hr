@@ -6,6 +6,7 @@ import {
   Cog, Bell, Mail, History, Shield, User, Link, Check, Plus, Close, Copy, Refresh,
 } from "@/components/icons";
 import { cn } from "@/lib/cn";
+import { APIDocsPanel } from "./APIDocsPanel";
 
 // ── Tab definitions ─────────────────────────────────────────────────────────
 const TABS = [
@@ -900,6 +901,7 @@ function SettingsWebhooks() {
   const [copied,       setCopied]       = useState<string | null>(null);
   const [showNewKey,   setShowNewKey]   = useState(false);
   const [webhookModal, setWebhookModal] = useState<WebhookDoc | null | "new">(null);
+  const [showDocs,     setShowDocs]     = useState(false);
 
   function copy(text: string, key: string) {
     navigator.clipboard?.writeText(text).catch(() => null);
@@ -995,8 +997,8 @@ function SettingsWebhooks() {
         </div>
       </Section>
 
-      <Section title="Documentación REST" sub={`Base URL: ${import.meta.env.VITE_FIREBASE_PROJECT_ID ? `https://api.avivacredito.com/hr/v1` : "(configura VITE_API_BASE_URL)"}`} action={
-        <Button size="sm" variant="secondary" icon={<Link size={12} />} onClick={() => window.open("https://api.avivacredito.com/hr/v1/docs", "_blank")}>Abrir docs</Button>
+      <Section title="Documentación REST" sub="Base URL: https://api.avivacredito.com/hr/v1" action={
+        <Button size="sm" variant="primary" icon={<Link size={12} />} onClick={() => setShowDocs(true)}>Abrir guía completa</Button>
       }>
         <div className="space-y-2">
           {[
@@ -1028,6 +1030,7 @@ function SettingsWebhooks() {
           onClose={() => setWebhookModal(null)}
         />
       )}
+      {showDocs && <APIDocsPanel onClose={() => setShowDocs(false)} />}
     </>
   );
 }

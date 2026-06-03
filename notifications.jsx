@@ -641,6 +641,8 @@ function SettingsAPIKeys() {
   ]);
   const [showNew, setShowNew] = useNS(false);
   const [created, setCreated] = useNS(null);
+  const [rotating, setRotating] = useNS(null);
+  const [revoking, setRevoking] = useNS(null);
 
   function generate(name, scopes) {
     const id = "k" + (keys.length + 1);
@@ -650,6 +652,20 @@ function SettingsAPIKeys() {
     setKeys([newKey, ...keys]);
     setCreated({ ...newKey, full });
     setShowNew(false);
+  }
+
+  function rotate(k) {
+    const newPrefix = "ak_live_" + Math.random().toString(36).slice(2, 6);
+    const full = newPrefix + "_" + Math.random().toString(36).slice(2, 18) + Math.random().toString(36).slice(2, 18);
+    const rotated = { ...k, prefix: newPrefix, lastUsed: "nunca", status: "ok" };
+    setKeys(keys.map(x => x.id === k.id ? rotated : x));
+    setRotating(null);
+    setCreated({ ...rotated, full });
+  }
+
+  function revoke(id) {
+    setKeys(keys.filter(k => k.id !== id));
+    setRevoking(null);
   }
 
   return (
@@ -680,16 +696,18 @@ function SettingsAPIKeys() {
                 </div>
               </div>
               <div className="row" style={{ gap: 6 }}>
-                <button className="btn sm">Rotar</button>
-                <button className="btn sm danger">Revocar</button>
+                <button className="btn sm" onClick={() => setRotating(k)}>Rotar</button>
+                <button className="btn sm danger" onClick={() => setRevoking(k)}>Revocar</button>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {showNew && <NewKeyForm onClose={() => setShowNew(false)} onGenerate={generate}/>}
-      {created && <CreatedKeyView k={created} onClose={() => setCreated(null)}/>}
+      {showNew   && <NewKeyForm onClose={() => setShowNew(false)} onGenerate={generate}/>}
+      {created   && <CreatedKeyView k={created} onClose={() => setCreated(null)}/>}
+      {rotating  && <RotateKeyConfirm k={rotating} onClose={() => setRotating(null)} onConfirm={rotate}/>}
+      {revoking  && <RevokeKeyConfirm k={revoking} onClose={() => setRevoking(null)} onConfirm={revoke}/>}
     </React.Fragment>
   );
 }
@@ -820,41 +838,347 @@ function CreatedKeyView({ k, onClose }) {
   );
 }
 
-function SettingsWebhooksList() {
-  const hooks = [
-    { url: "https://api.aviva.com/hr/people-events",      events: ["onboard.*", "offboard.*"], status: "ok",   last: "hace 2 min · 200" },
-    { url: "https://hooks.hubspot.com/aviva-people",      events: ["users.created", "users.updated"], status: "ok", last: "hace 8 min · 200" },
-    { url: "https://hooks.datadog.com/aviva-hr",          events: ["offboard.failed", "sync.error"], status: "ok", last: "hace 1 h · 200" },
-    { url: "https://internal.aviva.com/audit-stream",     events: ["*"], status: "warn", last: "hace 14 min · 503" },
-  ];
+function RotateKeyConfirm({ k, onClose, onConfirm }) {
   return (
-    <div className="settings-section">
-      <div className="head" style={{ display: "flex", justifyContent: "space-between" }}>
-        <div><h3>Webhooks salientes</h3>
-          <div className="sub">Aviva HR envía eventos POST JSON a estos endpoints.</div>
-        </div>
-        <button className="btn accent">{Ic.plus} Nuevo webhook</button>
-      </div>
-      <div className="body" style={{ padding: 0 }}>
-        {hooks.map((h, i) => (
-          <div key={i} className="row" style={{ padding: "14px 18px", borderBottom: i < hooks.length - 1 ? "1px solid var(--line)" : 0, gap: 12, flexWrap: "wrap" }}>
-            <code style={{ background: "var(--surface-2)", padding: "4px 10px", borderRadius: 4, fontSize: 12, fontFamily: "var(--mono)" }}>{h.url}</code>
-            <div className="row" style={{ gap: 4, flexWrap: "wrap" }}>
-              {h.events.map(e => <span key={e} className="scope-pill">{e}</span>)}
+    <React.Fragment>
+      <div className="scrim" onClick={onClose}/>
+      <div className="modal">
+        <div className="panel" style={{ width: "min(480px, 96vw)" }}>
+          <div className="row" style={{ padding: "14px 20px", borderBottom: "1px solid var(--line)" }}>
+            <div className="col">
+              <div style={{ fontWeight: 600, fontSize: 15 }}>Rotar API Key</div>
+              <div style={{ fontSize: 12, color: "var(--ink-3)" }}>Se generará una nueva key con los mismos permisos.</div>
             </div>
             <span style={{ flex: 1 }}/>
-            <span style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{h.last}</span>
-            {h.status === "ok" ? <span className="badge active"><span className="dot"/>OK</span>
-                              : <span className="badge suspended"><span className="dot"/>1 fallo</span>}
-            <button className="btn sm">Editar</button>
+            <button className="iconbtn" onClick={onClose}>{Ic.close}</button>
           </div>
-        ))}
+          <div style={{ padding: 20 }}>
+            <div className="row" style={{ gap: 8, padding: 12, background: "#fff3d6", color: "#8a5a00", borderRadius: 10, fontSize: 13, marginBottom: 16 }}>
+              {Ic.warn} <span>La key actual (<code style={{ fontFamily: "var(--mono)" }}>{k.prefix}_•••</code>) quedará <b>inválida de inmediato</b>.</span>
+            </div>
+            <div style={{ fontSize: 13, color: "var(--ink-2)", lineHeight: 1.6 }}>
+              Cualquier servicio que use esta key dejará de funcionar hasta que actualices el secreto. Asegúrate de tener acceso al sistema de destino antes de continuar.
+            </div>
+          </div>
+          <div style={{ padding: 14, borderTop: "1px solid var(--line)", display: "flex", gap: 8 }}>
+            <button className="btn ghost" onClick={onClose}>Cancelar</button>
+            <span style={{ flex: 1 }}/>
+            <button className="btn primary" onClick={() => onConfirm(k)}>{Ic.refresh} Rotar y mostrar nueva key</button>
+          </div>
+        </div>
       </div>
-    </div>
+    </React.Fragment>
   );
 }
 
+function RevokeKeyConfirm({ k, onClose, onConfirm }) {
+  const [typed, setTyped] = useNS("");
+  const confirmed = typed === k.name;
+  return (
+    <React.Fragment>
+      <div className="scrim" onClick={onClose}/>
+      <div className="modal">
+        <div className="panel" style={{ width: "min(480px, 96vw)" }}>
+          <div className="row" style={{ padding: "14px 20px", borderBottom: "1px solid var(--line)" }}>
+            <div className="col">
+              <div style={{ fontWeight: 600, fontSize: 15 }}>Revocar API Key</div>
+              <div style={{ fontSize: 12, color: "var(--danger-fg)" }}>Esta acción es permanente e irreversible.</div>
+            </div>
+            <span style={{ flex: 1 }}/>
+            <button className="iconbtn" onClick={onClose}>{Ic.close}</button>
+          </div>
+          <div style={{ padding: 20 }}>
+            <div className="row" style={{ gap: 8, padding: 12, background: "var(--danger-bg)", color: "var(--danger-fg)", borderRadius: 10, fontSize: 13, marginBottom: 16 }}>
+              {Ic.warn} <span>La key <code style={{ fontFamily: "var(--mono)" }}>{k.prefix}_•••</code> quedará <b>inválida permanentemente</b>.</span>
+            </div>
+            <div className="field">
+              <label>Escribe <b>{k.name}</b> para confirmar</label>
+              <input type="text" value={typed} onChange={e => setTyped(e.target.value)} placeholder={k.name} autoFocus/>
+            </div>
+          </div>
+          <div style={{ padding: 14, borderTop: "1px solid var(--line)", display: "flex", gap: 8 }}>
+            <button className="btn ghost" onClick={onClose}>Cancelar</button>
+            <span style={{ flex: 1 }}/>
+            <button className="btn danger" disabled={!confirmed} onClick={() => onConfirm(k.id)}>Revocar definitivamente</button>
+          </div>
+        </div>
+      </div>
+    </React.Fragment>
+  );
+}
+
+const ALL_WEBHOOK_EVENTS = [
+  "users.created", "users.updated", "users.deleted",
+  "onboard.created", "onboard.firstlogin",
+  "offboard.created", "offboard.approved", "offboard.completed", "offboard.failed",
+  "access.granted", "access.revoked",
+  "device.assigned", "sync.completed",
+];
+
+function SettingsWebhooksList() {
+  const [hooks, setHooks] = useNS([
+    { id: "wh1", url: "https://api.aviva.com/hr/people-events",  events: ["onboard.*", "offboard.*"],          secret: "", status: "ok",   last: "hace 2 min · 200" },
+    { id: "wh2", url: "https://hooks.hubspot.com/aviva-people",  events: ["users.created", "users.updated"],   secret: "", status: "ok",   last: "hace 8 min · 200" },
+    { id: "wh3", url: "https://hooks.datadog.com/aviva-hr",      events: ["offboard.failed", "sync.completed"],secret: "", status: "ok",   last: "hace 1 h · 200" },
+    { id: "wh4", url: "https://internal.aviva.com/audit-stream", events: ["*"],                                secret: "", status: "warn", last: "hace 14 min · 503" },
+  ]);
+  const [showNew, setShowNew] = useNS(false);
+  const [editing, setEditing] = useNS(null);
+
+  function saveHook(hook) {
+    if (hook.id) {
+      setHooks(hooks.map(h => h.id === hook.id ? { ...h, ...hook } : h));
+    } else {
+      setHooks([...hooks, { ...hook, id: "wh" + Date.now(), status: "ok", last: "nunca" }]);
+    }
+    setShowNew(false);
+    setEditing(null);
+  }
+
+  function deleteHook(id) {
+    setHooks(hooks.filter(h => h.id !== id));
+    setEditing(null);
+  }
+
+  return (
+    <React.Fragment>
+      <div className="settings-section">
+        <div className="head" style={{ display: "flex", justifyContent: "space-between" }}>
+          <div>
+            <h3>Webhooks salientes</h3>
+            <div className="sub">Aviva HR envía eventos POST JSON a estos endpoints.</div>
+          </div>
+          <button className="btn accent" onClick={() => setShowNew(true)}>{Ic.plus} Nuevo webhook</button>
+        </div>
+        <div className="body" style={{ padding: 0 }}>
+          {hooks.map((h, i) => (
+            <div key={h.id} className="row" style={{ padding: "14px 18px", borderBottom: i < hooks.length - 1 ? "1px solid var(--line)" : 0, gap: 12, flexWrap: "wrap" }}>
+              <code style={{ background: "var(--surface-2)", padding: "4px 10px", borderRadius: 4, fontSize: 12, fontFamily: "var(--mono)" }}>{h.url}</code>
+              <div className="row" style={{ gap: 4, flexWrap: "wrap" }}>
+                {h.events.map(e => <span key={e} className="scope-pill">{e}</span>)}
+              </div>
+              <span style={{ flex: 1 }}/>
+              <span style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{h.last}</span>
+              {h.status === "ok"
+                ? <span className="badge active"><span className="dot"/>OK</span>
+                : <span className="badge suspended"><span className="dot"/>1 fallo</span>}
+              <button className="btn sm" onClick={() => setEditing(h)}>Editar</button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {showNew && <WebhookForm onClose={() => setShowNew(false)} onSave={saveHook}/>}
+      {editing  && <WebhookForm hook={editing} onClose={() => setEditing(null)} onSave={saveHook} onDelete={deleteHook}/>}
+    </React.Fragment>
+  );
+}
+
+function WebhookForm({ hook, onClose, onSave, onDelete }) {
+  const isEdit = !!hook;
+  const [url, setUrl] = useNS(hook?.url ?? "");
+  const [secret, setSecret] = useNS(hook?.secret ?? "");
+  const [events, setEvents] = useNS(hook?.events ?? []);
+  const [confirmDelete, setConfirmDelete] = useNS(false);
+
+  function toggleEvent(e) {
+    if (e === "*") {
+      setEvents(events.includes("*") ? [] : ["*"]);
+      return;
+    }
+    const without = events.filter(x => x !== "*");
+    setEvents(without.includes(e) ? without.filter(x => x !== e) : [...without, e]);
+  }
+
+  function handleSave() {
+    onSave({ ...(hook ?? {}), url: url.trim(), secret: secret.trim(), events });
+  }
+
+  const valid = url.trim().startsWith("http") && events.length > 0;
+
+  return (
+    <React.Fragment>
+      <div className="scrim" onClick={onClose}/>
+      <div className="modal">
+        <div className="panel" style={{ width: "min(600px, 96vw)" }}>
+          <div className="row" style={{ padding: "14px 20px", borderBottom: "1px solid var(--line)" }}>
+            <div className="col">
+              <div style={{ fontWeight: 600, fontSize: 15 }}>{isEdit ? "Editar webhook" : "Nuevo webhook"}</div>
+              <div style={{ fontSize: 12, color: "var(--ink-3)" }}>Aviva HR enviará un POST JSON firmado a esta URL.</div>
+            </div>
+            <span style={{ flex: 1 }}/>
+            <button className="iconbtn" onClick={onClose}>{Ic.close}</button>
+          </div>
+
+          <div style={{ padding: 20, maxHeight: "65vh", overflowY: "auto" }}>
+            <div className="field">
+              <label>URL del endpoint</label>
+              <input type="url" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://tu-servicio.com/webhook"/>
+              <span className="hint">Debe responder con HTTP 2xx en menos de 10 s.</span>
+            </div>
+
+            <div className="field">
+              <label>Secreto HMAC <span style={{ fontWeight: 400, color: "var(--ink-3)" }}>(opcional)</span></label>
+              <input type="text" value={secret} onChange={e => setSecret(e.target.value)} placeholder="Dejar vacío para no firmar"/>
+              <span className="hint">Si se proporciona, cada request incluirá el header <code style={{ fontFamily: "var(--mono)", fontSize: 11 }}>X-Aviva-Signature</code>.</span>
+            </div>
+
+            <div className="field">
+              <label>Eventos suscritos</label>
+              <span className="hint">Elige qué eventos disparan este webhook.</span>
+              <div className="col" style={{ gap: 4, marginTop: 8 }}>
+                <label className="row" style={{
+                  gap: 10, padding: "8px 10px",
+                  border: "1px solid var(--line)", borderRadius: 8,
+                  background: events.includes("*") ? "var(--mint-50)" : "var(--surface)", cursor: "pointer"
+                }}>
+                  <input type="checkbox" className="cb" checked={events.includes("*")} onChange={() => toggleEvent("*")}/>
+                  <div style={{ flex: 1 }}>
+                    <code style={{ fontSize: 11, fontFamily: "var(--mono)", color: "var(--green-700)", fontWeight: 600 }}>*</code>
+                    <span style={{ marginLeft: 8, fontWeight: 600, fontSize: 13 }}>Todos los eventos</span>
+                  </div>
+                </label>
+                {!events.includes("*") && ALL_WEBHOOK_EVENTS.map(e => (
+                  <label key={e} className="row" style={{
+                    gap: 10, padding: "8px 10px",
+                    border: "1px solid var(--line)", borderRadius: 8,
+                    background: events.includes(e) ? "var(--mint-50)" : "var(--surface)", cursor: "pointer"
+                  }}>
+                    <input type="checkbox" className="cb" checked={events.includes(e)} onChange={() => toggleEvent(e)}/>
+                    <code style={{ flex: 1, fontSize: 11, fontFamily: "var(--mono)", color: "var(--green-700)", fontWeight: 600 }}>{e}</code>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ padding: 14, borderTop: "1px solid var(--line)", display: "flex", gap: 8 }}>
+            {isEdit && !confirmDelete && (
+              <button className="btn sm danger" onClick={() => setConfirmDelete(true)}>Eliminar</button>
+            )}
+            {isEdit && confirmDelete && (
+              <div className="row" style={{ gap: 6 }}>
+                <span style={{ fontSize: 12, color: "var(--danger-fg)" }}>¿Confirmar eliminación?</span>
+                <button className="btn sm danger" onClick={() => onDelete(hook.id)}>Sí, eliminar</button>
+                <button className="btn sm ghost" onClick={() => setConfirmDelete(false)}>No</button>
+              </div>
+            )}
+            <span style={{ flex: 1 }}/>
+            <button className="btn ghost" onClick={onClose}>Cancelar</button>
+            <button className="btn primary" disabled={!valid} onClick={handleSave}>
+              {isEdit ? "Guardar cambios" : <>{Ic.plus} Crear webhook</>}
+            </button>
+          </div>
+        </div>
+      </div>
+    </React.Fragment>
+  );
+}
+
+const EVENT_SCHEMAS = {
+  "users.created": {
+    event: "users.created",
+    occurred_at: "2026-06-03T10:14:22Z",
+    data: {
+      id: "u-385_02",
+      num_colaborador: "385_02",
+      nombre: "Adrián Contreras Zapata",
+      email: "adrian.contreras@avivacredito.com",
+      puesto: "Kiosk Manager",
+      hub: "hub1-region_hidalgo",
+      quiosco: "Tulancingo",
+      estado: "Hidalgo",
+      fecha_ingreso: "2026-06-01",
+      status: "active",
+    },
+  },
+  "users.updated": {
+    event: "users.updated",
+    occurred_at: "2026-06-03T11:02:05Z",
+    data: {
+      id: "u-312_01",
+      changed_fields: ["puesto", "hub"],
+      before: { puesto: "Asesor de Crédito", hub: "hub2-region_cdmx" },
+      after:  { puesto: "Kiosk Manager",     hub: "hub1-region_hidalgo" },
+    },
+  },
+  "users.deleted": {
+    event: "users.deleted",
+    occurred_at: "2026-06-03T09:00:00Z",
+    data: { id: "u-201_03", nombre: "Laura Pérez Solís", reason: "offboarding_completed" },
+  },
+  "onboard.created": {
+    event: "onboard.created",
+    occurred_at: "2026-06-03T08:30:00Z",
+    data: {
+      ticket_id: "TKT-2098",
+      user_id: "u-385_02",
+      nombre: "Adrián Contreras Zapata",
+      fecha_ingreso: "2026-06-01",
+      provision: ["google", "slack", "okta"],
+    },
+  },
+  "onboard.firstlogin": {
+    event: "onboard.firstlogin",
+    occurred_at: "2026-06-03T09:15:11Z",
+    data: { user_id: "u-385_02", provider: "google_sso", ip: "189.216.x.x" },
+  },
+  "offboard.created": {
+    event: "offboard.created",
+    occurred_at: "2026-06-02T17:45:00Z",
+    data: {
+      ticket_id: "TKT-2041",
+      user_id: "u-201_03",
+      nombre: "Laura Pérez Solís",
+      last_day: "2026-06-15",
+      reason: "renuncia_voluntaria",
+      transfer_to: "u-080_01",
+    },
+  },
+  "offboard.approved": {
+    event: "offboard.approved",
+    occurred_at: "2026-06-02T18:10:00Z",
+    data: { ticket_id: "TKT-2041", approved_by: ["u-001", "u-004", "u-011"], stages_completed: 3 },
+  },
+  "offboard.completed": {
+    event: "offboard.completed",
+    occurred_at: "2026-06-02T18:30:00Z",
+    data: { ticket_id: "TKT-2041", tasks_ok: 6, tasks_failed: 0, duration_s: 48 },
+  },
+  "offboard.failed": {
+    event: "offboard.failed",
+    occurred_at: "2026-06-02T18:28:00Z",
+    data: {
+      ticket_id: "TKT-2041",
+      failed_task: "hubspot_contact_reassign",
+      error: "CONFLICT: 14 open deals",
+      retry_at: "2026-06-02T18:43:00Z",
+    },
+  },
+  "access.granted": {
+    event: "access.granted",
+    occurred_at: "2026-06-01T10:00:00Z",
+    data: { user_id: "u-385_02", app: "hubspot", role: "viewer", granted_by: "u-001" },
+  },
+  "access.revoked": {
+    event: "access.revoked",
+    occurred_at: "2026-06-15T18:30:00Z",
+    data: { user_id: "u-201_03", app: "slack", revoked_by: "system", reason: "offboarding" },
+  },
+  "device.assigned": {
+    event: "device.assigned",
+    occurred_at: "2026-06-01T09:00:00Z",
+    data: { user_id: "u-385_02", device_type: "tablet", model: "Samsung Galaxy Tab A9", serial: "SN-20240601-0042" },
+  },
+  "sync.completed": {
+    event: "sync.completed",
+    occurred_at: "2026-06-03T06:00:00Z",
+    data: { integration: "hubspot", records_synced: 142, records_skipped: 3, duration_s: 11 },
+  },
+};
+
 function SettingsAPIEvents() {
+  const [schemaFor, setSchemaFor] = useNS(null);
   const evts = [
     { id: "users.created",         desc: "Se creó un colaborador." },
     { id: "users.updated",         desc: "Se editaron datos de un colaborador." },
@@ -871,32 +1195,77 @@ function SettingsAPIEvents() {
     { id: "sync.completed",        desc: "Sincronización con una integración terminó." },
   ];
   return (
-    <div className="settings-section">
-      <div className="head">
-        <h3>Catálogo de eventos</h3>
-        <div className="sub">Todos los eventos que Aviva HR puede emitir hacia webhooks o consultar vía API.</div>
-      </div>
-      <div className="body" style={{ padding: 0 }}>
-        <table className="users" style={{ width: "100%" }}>
-          <thead>
-            <tr>
-              <th style={{ width: 260 }}>Evento</th>
-              <th>Descripción</th>
-              <th style={{ width: 140, textAlign: "right" }}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {evts.map(e => (
-              <tr key={e.id}>
-                <td><code style={{ fontFamily: "var(--mono)", fontSize: 12, color: "var(--green-700)", fontWeight: 600 }}>{e.id}</code></td>
-                <td style={{ color: "var(--ink-2)", fontSize: 13 }}>{e.desc}</td>
-                <td style={{ textAlign: "right" }}><button className="btn sm">Ver schema</button></td>
+    <React.Fragment>
+      <div className="settings-section">
+        <div className="head">
+          <h3>Catálogo de eventos</h3>
+          <div className="sub">Todos los eventos que Aviva HR puede emitir hacia webhooks o consultar vía API.</div>
+        </div>
+        <div className="body" style={{ padding: 0 }}>
+          <table className="users" style={{ width: "100%" }}>
+            <thead>
+              <tr>
+                <th style={{ width: 260 }}>Evento</th>
+                <th>Descripción</th>
+                <th style={{ width: 140, textAlign: "right" }}></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {evts.map(e => (
+                <tr key={e.id}>
+                  <td><code style={{ fontFamily: "var(--mono)", fontSize: 12, color: "var(--green-700)", fontWeight: 600 }}>{e.id}</code></td>
+                  <td style={{ color: "var(--ink-2)", fontSize: 13 }}>{e.desc}</td>
+                  <td style={{ textAlign: "right" }}>
+                    <button className="btn sm" onClick={() => setSchemaFor(e.id)}>Ver schema</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
+
+      {schemaFor && <EventSchemaModal eventId={schemaFor} onClose={() => setSchemaFor(null)}/>}
+    </React.Fragment>
+  );
+}
+
+function EventSchemaModal({ eventId, onClose }) {
+  const [copied, setCopied] = useNS(false);
+  const schema = EVENT_SCHEMAS[eventId];
+  const json = JSON.stringify(schema, null, 2);
+  function copy() {
+    navigator.clipboard?.writeText(json);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+  return (
+    <React.Fragment>
+      <div className="scrim" onClick={onClose}/>
+      <div className="modal">
+        <div className="panel" style={{ width: "min(620px, 96vw)" }}>
+          <div className="row" style={{ padding: "14px 20px", borderBottom: "1px solid var(--line)" }}>
+            <div className="col">
+              <div style={{ fontWeight: 600, fontSize: 15 }}>Schema del evento</div>
+              <code style={{ fontSize: 12, color: "var(--green-700)", fontFamily: "var(--mono)", fontWeight: 600 }}>{eventId}</code>
+            </div>
+            <span style={{ flex: 1 }}/>
+            <button className="btn sm" style={{ marginRight: 8 }} onClick={copy}>
+              {copied ? <>{Ic.check} Copiado</> : <>{Ic.link} Copiar</>}
+            </button>
+            <button className="iconbtn" onClick={onClose}>{Ic.close}</button>
+          </div>
+          <div style={{ padding: 20 }}>
+            <pre style={{
+              background: "var(--ink)", color: "#cfeede",
+              padding: 16, borderRadius: 10,
+              fontFamily: "var(--mono)", fontSize: 12.5, lineHeight: 1.6,
+              overflow: "auto", margin: 0, maxHeight: "60vh",
+            }}>{json}</pre>
+          </div>
+        </div>
+      </div>
+    </React.Fragment>
   );
 }
 
