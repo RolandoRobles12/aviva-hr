@@ -812,30 +812,55 @@ function SectionEndpoints() {
       <div className="flex-1 overflow-y-auto min-w-0">
 
         {/* Token bar — sticky */}
-        <div className="sticky top-0 z-10 flex items-center gap-3 px-5 py-2.5 bg-[var(--color-surface)] border-b border-[var(--color-line)] shadow-sm">
-          <span className="text-[12px] font-medium text-[var(--color-ink-3)] shrink-0">API Token</span>
-          <div className="relative flex-1 max-w-sm">
-            <input
-              type={showToken ? "text" : "password"}
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              placeholder="ak_live_xxxx_••••••••••••••••••••••••"
-              className="w-full h-7 pl-2.5 pr-16 rounded border border-[var(--color-line)] bg-[var(--color-surface-2)] text-[var(--color-ink)] text-[11.5px] font-mono outline-none focus:border-green-400"
-            />
-            <button
-              onClick={() => setShowToken(v => !v)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[var(--color-ink-4)] hover:text-[var(--color-ink-2)]"
-            >
-              {showToken ? "ocultar" : "mostrar"}
-            </button>
-          </div>
-          {token ? (
-            <span className="flex items-center gap-1.5 text-[11px] text-green-700 font-medium shrink-0">
-              <span className="size-1.5 rounded-full bg-green-500 inline-block" /> Try It! activo
-            </span>
-          ) : (
-            <span className="text-[11px] text-[var(--color-ink-4)] shrink-0">Pega tu key para probar en vivo</span>
+        <div className={cn(
+          "sticky top-0 z-10 px-5 py-3 border-b shadow-sm transition-colors",
+          token
+            ? "bg-[var(--color-mint-50)] border-green-200"
+            : "bg-[#fffbea] border-[#f5d87a]"
+        )}>
+          {!token && (
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[13px]">🔑</span>
+              <span className="text-[13px] font-semibold text-[#8a5a00]">
+                Pega tu API Key para activar Try It!
+              </span>
+            </div>
           )}
+          <div className="flex items-center gap-3">
+            {token && (
+              <span className="text-[12px] font-semibold text-green-700 shrink-0">API Token</span>
+            )}
+            <div className="relative flex-1 max-w-lg">
+              <input
+                type={showToken ? "text" : "password"}
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                placeholder="ak_live_xxxx_••••••••••••••••••••••••••••••••••••••••••••••••"
+                className={cn(
+                  "w-full h-9 pl-3 pr-20 rounded-lg border text-[12.5px] font-mono outline-none transition-colors",
+                  token
+                    ? "border-green-300 bg-white text-[var(--color-ink)] focus:border-green-500"
+                    : "border-[#f5d87a] bg-white text-[var(--color-ink)] focus:border-[#e5a800] placeholder:text-[#bfa050]"
+                )}
+              />
+              <button
+                onClick={() => setShowToken(v => !v)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-medium text-[var(--color-ink-4)] hover:text-[var(--color-ink-2)] transition-colors"
+              >
+                {showToken ? "ocultar" : "mostrar"}
+              </button>
+            </div>
+            {token ? (
+              <span className="flex items-center gap-1.5 text-[12px] text-green-700 font-semibold shrink-0">
+                <span className="size-2 rounded-full bg-green-500 inline-block" />
+                Try It! activo
+              </span>
+            ) : (
+              <span className="text-[12px] text-[#8a5a00] shrink-0">
+                Crea una key en <strong>Ajustes → Webhooks y API</strong>
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Endpoint header */}
@@ -928,7 +953,7 @@ function SectionEndpoints() {
                     <input
                       value={queryValues[p.name] ?? ""}
                       onChange={e => setQueryValues(prev => ({ ...prev, [p.name]: e.target.value }))}
-                      placeholder={p.type}
+                      placeholder={p.desc}
                       className="flex-1 h-7 px-2 rounded border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)] text-[11.5px] font-mono outline-none focus:border-green-400"
                     />
                   </div>
@@ -980,7 +1005,7 @@ function SectionEndpoints() {
                 <span className="text-[12px] text-[var(--color-ink-3)]">{response.time} ms</span>
                 <div className="ml-auto"><CopyBtn text={response.body} /></div>
               </div>
-              <pre className="bg-[#0d1f1a] text-[#cfeede] px-4 py-3 font-mono text-[12.5px] leading-relaxed overflow-auto m-0 max-h-80 whitespace-pre">{response.body}</pre>
+              <pre className="bg-[#0d1f1a] text-[#cfeede] px-4 py-3 font-mono text-[12.5px] leading-relaxed overflow-auto m-0 whitespace-pre">{response.body}</pre>
             </div>
           )}
         </div>
