@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { Close, Copy, Check, Link, Shield, ExternalLink } from "@/components/icons";
 import { cn } from "@/lib/cn";
@@ -494,7 +494,8 @@ function buildCode(
 }
 
 // ── Endpoint card ─────────────────────────────────────────────────────────────
-function EndpointCard({ ep, token }: { ep: typeof ENDPOINTS[0]; token: string }) {
+// ── REPLACED: master-detail SectionEndpoints below ───────────────────────────
+function EndpointCard_UNUSED({ ep, token }: { ep: typeof ENDPOINTS[0]; token: string }) {
   const [open,        setOpen]        = useState(false);
   const [lang,        setLang]        = useState<"curl" | "node" | "python">("curl");
   const [pathValues,  setPathValues]  = useState<Record<string, string>>({});
@@ -712,13 +713,278 @@ function EndpointCard({ ep, token }: { ep: typeof ENDPOINTS[0]; token: string })
   );
 }
 
-function SectionEndpoints({ token }: { token: string }) {
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION: Endpoints — master-detail layout
+// ═══════════════════════════════════════════════════════════════════════════════
+function SectionEndpoints() {
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const [token,       setToken]       = useState("");
+  const [showToken,   setShowToken]   = useState(false);
+  const [lang,        setLang]        = useState<"curl" | "node" | "python">("curl");
+  const [pathValues,  setPathValues]  = useState<Record<string, string>>({});
+  const [queryValues, setQueryValues] = useState<Record<string, string>>({});
+  const [bodyText,    setBodyText]    = useState(() => ENDPOINTS[0].body ? makeBodyTemplate(ENDPOINTS[0].body) : "");
+  const [loading,     setLoading]     = useState(false);
+  const [response,    setResponse]    = useState<{ status: number; time: number; body: string } | null>(null);
+
+  const ep = ENDPOINTS[selectedIdx];
+  const pathParamNames = ep.path.match(/:(\w+)/g)?.map(p => p.slice(1)) ?? [];
+
+  useEffect(() => {
+    setPathValues({});
+    setQueryValues({});
+    setBodyText(ep.body ? makeBodyTemplate(ep.body) : "");
+    setResponse(null);
+  }, [selectedIdx]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function buildUrl() {
+    let path = "/hr/v1" + ep.path;
+    for (const name of pathParamNames) {
+      path = path.replace(`:${name}`, encodeURIComponent(pathValues[name]?.trim() || `:${name}`));
+    }
+    const qs = Object.entries(queryValues)
+      .filter(([, v]) => v.trim())
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v.trim())}`)
+      .join("&");
+    return CLOUD_URL + path + (qs ? `?${qs}` : "");
+  }
+
+  async function sendRequest() {
+    if (!token) return;
+    setLoading(true);
+    setResponse(null);
+    const url = buildUrl();
+    const t0 = Date.now();
+    try {
+      const res = await fetch(url, {
+        method: ep.method,
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          ...(["POST", "PATCH"].includes(ep.method) ? { "Content-Type": "application/json" } : {}),
+        },
+        ...(["POST", "PATCH"].includes(ep.method) && bodyText.trim() ? { body: bodyText } : {}),
+      });
+      const time = Date.now() - t0;
+      let body = "";
+      try { body = JSON.stringify(await res.json(), null, 2); }
+      catch { body = await res.text(); }
+      setResponse({ status: res.status, time, body });
+    } catch (err) {
+      setResponse({ status: 0, time: Date.now() - t0, body: String(err) });
+    } finally { setLoading(false); }
+  }
+
+  const statusBadge = response
+    ? response.status >= 200 && response.status < 300
+      ? "text-green-600 border-green-300 bg-[var(--color-mint-50)]"
+      : response.status >= 400 && response.status < 500
+        ? "text-[#8a5a00] border-[#f5d87a] bg-[#fff3d6]"
+        : "text-red-700 border-red-300 bg-red-50"
+    : "";
+
   return (
-    <div>
-      <H2>Referencia REST</H2>
-      <P>Base URL: <IC>{BASE_URL}</IC> · Todos los requests requieren <IC>Authorization: Bearer &lt;key&gt;</IC>.</P>
-      <Note>Los campos con <span className="text-red-500 font-bold">*</span> son obligatorios. Despliega cada endpoint para ver parámetros y probar en vivo.</Note>
-      {ENDPOINTS.map((ep) => <EndpointCard key={ep.method + ep.path} ep={ep} token={token} />)}
+    <div className="flex h-full">
+      {/* Left: endpoint list */}
+      <div className="w-56 shrink-0 border-r border-[var(--color-line)] overflow-y-auto py-2 bg-[var(--color-surface)]">
+        <div className="px-3 pb-1.5 pt-1 text-[10.5px] font-semibold text-[var(--color-ink-4)] uppercase tracking-widest">
+          {ENDPOINTS.length} endpoints
+        </div>
+        {ENDPOINTS.map((e, i) => (
+          <button
+            key={i}
+            onClick={() => setSelectedIdx(i)}
+            className={cn(
+              "w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors border-r-2",
+              i === selectedIdx
+                ? "bg-[var(--color-mint-50)] border-green-500"
+                : "border-transparent hover:bg-[var(--color-surface-2)]"
+            )}
+          >
+            <MethodBadge method={e.method} />
+            <code className={cn("font-mono text-[11.5px] truncate", i === selectedIdx ? "text-green-700 font-semibold" : "text-[var(--color-ink-2)]")}>
+              {e.path}
+            </code>
+          </button>
+        ))}
+      </div>
+
+      {/* Right: detail + try it */}
+      <div className="flex-1 overflow-y-auto min-w-0">
+
+        {/* Token bar — sticky */}
+        <div className="sticky top-0 z-10 flex items-center gap-3 px-5 py-2.5 bg-[var(--color-surface)] border-b border-[var(--color-line)] shadow-sm">
+          <span className="text-[12px] font-medium text-[var(--color-ink-3)] shrink-0">API Token</span>
+          <div className="relative flex-1 max-w-sm">
+            <input
+              type={showToken ? "text" : "password"}
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              placeholder="ak_live_xxxx_••••••••••••••••••••••••"
+              className="w-full h-7 pl-2.5 pr-16 rounded border border-[var(--color-line)] bg-[var(--color-surface-2)] text-[var(--color-ink)] text-[11.5px] font-mono outline-none focus:border-green-400"
+            />
+            <button
+              onClick={() => setShowToken(v => !v)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[var(--color-ink-4)] hover:text-[var(--color-ink-2)]"
+            >
+              {showToken ? "ocultar" : "mostrar"}
+            </button>
+          </div>
+          {token ? (
+            <span className="flex items-center gap-1.5 text-[11px] text-green-700 font-medium shrink-0">
+              <span className="size-1.5 rounded-full bg-green-500 inline-block" /> Try It! activo
+            </span>
+          ) : (
+            <span className="text-[11px] text-[var(--color-ink-4)] shrink-0">Pega tu key para probar en vivo</span>
+          )}
+        </div>
+
+        {/* Endpoint header */}
+        <div className="px-6 pt-5 pb-3 border-b border-[var(--color-line)]">
+          <div className="flex items-center gap-3 mb-1.5">
+            <MethodBadge method={ep.method} />
+            <code className="font-mono text-[15px] font-semibold text-[var(--color-ink)]">{ep.path}</code>
+            <span className="font-mono text-[11px] text-[var(--color-ink-4)] px-1.5 py-0.5 rounded bg-[var(--color-surface-2)] border border-[var(--color-line)]">{ep.scope}</span>
+          </div>
+          <p className="text-[13px] text-[var(--color-ink-2)] leading-relaxed">{ep.desc}</p>
+        </div>
+
+        {/* Docs */}
+        <div className="px-6 py-5 border-b border-[var(--color-line)]">
+          {pathParamNames.length > 0 && (
+            <div className="mb-5">
+              <div className="text-[11.5px] font-semibold text-[var(--color-ink-3)] uppercase tracking-wide mb-2">Path params</div>
+              <ParamsTable rows={pathParamNames.map(name => ({ name, type: "string", req: true, desc: "Identificador del recurso." }))} />
+            </div>
+          )}
+          {ep.params && ep.params.length > 0 && (
+            <div className="mb-5">
+              <div className="text-[11.5px] font-semibold text-[var(--color-ink-3)] uppercase tracking-wide mb-2">Query params</div>
+              <ParamsTable rows={ep.params} />
+            </div>
+          )}
+          {ep.body && ep.body.length > 0 && (
+            <div className="mb-5">
+              <div className="text-[11.5px] font-semibold text-[var(--color-ink-3)] uppercase tracking-wide mb-2">Request body (JSON)</div>
+              <ParamsTable rows={ep.body} />
+            </div>
+          )}
+          {ep.response && (
+            <div>
+              <div className="text-[11.5px] font-semibold text-[var(--color-ink-3)] uppercase tracking-wide mb-2">Respuesta 200</div>
+              <Code code={ep.response} />
+            </div>
+          )}
+        </div>
+
+        {/* Try It header */}
+        <div className="flex items-center gap-3 px-6 py-3 bg-[var(--color-surface)] border-b border-[var(--color-line)]">
+          <span className="text-[13px] font-semibold text-[var(--color-ink-2)]">Try It!</span>
+          <div className="flex-1 h-px bg-[var(--color-line)]" />
+          {(["curl", "node", "python"] as const).map((l) => (
+            <button
+              key={l}
+              onClick={() => setLang(l)}
+              className={cn(
+                "px-3 py-1 rounded text-[12px] font-medium transition-colors border",
+                lang === l
+                  ? "bg-[var(--color-mint-50)] text-green-700 border-green-200"
+                  : "text-[var(--color-ink-3)] border-transparent hover:bg-[var(--color-surface-2)]"
+              )}
+            >
+              {l === "curl" ? "Shell" : l === "node" ? "Node.js" : "Python"}
+            </button>
+          ))}
+        </div>
+
+        {/* Inputs + code + send + response */}
+        <div className="px-6 py-5 space-y-5 max-w-2xl">
+
+          {pathParamNames.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-[11.5px] font-semibold text-[var(--color-ink-3)] uppercase tracking-wide">Path</div>
+              {pathParamNames.map(name => (
+                <div key={name} className="flex items-center gap-3">
+                  <IC>:{name}</IC>
+                  <input
+                    value={pathValues[name] ?? ""}
+                    onChange={e => setPathValues(p => ({ ...p, [name]: e.target.value }))}
+                    placeholder={name === "id" ? "u-385_02" : name}
+                    className="flex-1 h-8 px-2.5 rounded border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)] text-[12.5px] font-mono outline-none focus:border-green-400"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {ep.params && ep.params.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-[11.5px] font-semibold text-[var(--color-ink-3)] uppercase tracking-wide">
+                Query params <span className="normal-case font-normal text-[var(--color-ink-4)]">(vacío = omitir)</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {ep.params.map(p => (
+                  <div key={p.name} className="flex items-center gap-2">
+                    <code className="text-[11.5px] font-mono text-[var(--color-ink-3)] w-20 shrink-0">{p.name}</code>
+                    <input
+                      value={queryValues[p.name] ?? ""}
+                      onChange={e => setQueryValues(prev => ({ ...prev, [p.name]: e.target.value }))}
+                      placeholder={p.type}
+                      className="flex-1 h-7 px-2 rounded border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)] text-[11.5px] font-mono outline-none focus:border-green-400"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {["POST", "PATCH"].includes(ep.method) && ep.body && ep.body.length > 0 && (
+            <div>
+              <div className="text-[11.5px] font-semibold text-[var(--color-ink-3)] uppercase tracking-wide mb-1.5">Body JSON</div>
+              <textarea
+                value={bodyText}
+                onChange={e => setBodyText(e.target.value)}
+                rows={7}
+                spellCheck={false}
+                className="w-full px-3 py-2.5 rounded border border-[var(--color-line)] bg-[#0d1f1a] text-[#cfeede] text-[12.5px] font-mono outline-none resize-y focus:border-green-500"
+              />
+            </div>
+          )}
+
+          <div>
+            <div className="text-[11.5px] font-semibold text-[var(--color-ink-3)] uppercase tracking-wide mb-1">Código generado</div>
+            <Code code={buildCode(lang, ep.method, buildUrl(), token, bodyText)} />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              disabled={!token || loading}
+              onClick={sendRequest}
+              className={cn(
+                "px-6 py-2.5 rounded-lg text-[13px] font-semibold transition-colors",
+                token && !loading
+                  ? "bg-green-600 hover:bg-green-700 text-white"
+                  : "bg-[var(--color-line)] text-[var(--color-ink-4)] cursor-not-allowed"
+              )}
+            >
+              {loading ? "Enviando…" : "▶ Enviar request"}
+            </button>
+            {!token && <span className="text-[12px] text-[var(--color-ink-4)]">Agrega tu API Token arriba</span>}
+          </div>
+
+          {response && (
+            <div className="rounded-lg overflow-hidden border border-[var(--color-line)]">
+              <div className="flex items-center gap-3 px-4 py-2.5 bg-[var(--color-surface)] border-b border-[var(--color-line)]">
+                <span className={cn("font-mono text-[12px] font-bold px-2.5 py-0.5 rounded border", statusBadge)}>
+                  {response.status === 0 ? "ERROR" : response.status}
+                </span>
+                <span className="text-[12px] text-[var(--color-ink-3)]">{response.time} ms</span>
+                <div className="ml-auto"><CopyBtn text={response.body} /></div>
+              </div>
+              <pre className="bg-[#0d1f1a] text-[#cfeede] px-4 py-3 font-mono text-[12.5px] leading-relaxed overflow-auto m-0 max-h-80 whitespace-pre">{response.body}</pre>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1359,9 +1625,7 @@ function SectionConsole() {
 // MAIN PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
 export function APIDocsPanel({ onClose }: { onClose: () => void }) {
-  const [section,   setSection]   = useState<Section>("auth");
-  const [token,     setToken]     = useState("");
-  const [showToken, setShowToken] = useState(false);
+  const [section, setSection] = useState<Section>("auth");
 
   return (
     <>
@@ -1416,32 +1680,7 @@ export function APIDocsPanel({ onClose }: { onClose: () => void }) {
               </button>
             ))}
 
-            <div className="mx-4 mt-4 pt-4 border-t border-[var(--color-line)]">
-              <div className="text-[11px] font-semibold text-[var(--color-ink-4)] uppercase tracking-wide mb-2">API Token</div>
-              <div className="relative">
-                <input
-                  type={showToken ? "text" : "password"}
-                  value={token}
-                  onChange={(e) => setToken(e.target.value)}
-                  placeholder="ak_live_…"
-                  className="w-full h-7 pl-2 pr-12 rounded border border-[var(--color-line)] bg-[var(--color-surface-2)] text-[var(--color-ink)] text-[11px] font-mono outline-none focus:border-green-400"
-                />
-                <button
-                  onClick={() => setShowToken((v) => !v)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[var(--color-ink-4)] hover:text-[var(--color-ink-2)]"
-                >
-                  {showToken ? "ocultar" : "ver"}
-                </button>
-              </div>
-              {token && (
-                <div className="mt-1.5 flex items-center gap-1.5">
-                  <span className="size-1.5 rounded-full bg-green-500 shrink-0" />
-                  <span className="text-[10.5px] text-green-700 font-medium">Token activo — Try It! habilitado</span>
-                </div>
-              )}
-            </div>
-
-            <div className="mx-4 mt-4 pt-4 border-t border-[var(--color-line)]">
+            <div className="mx-4 mt-6 pt-4 border-t border-[var(--color-line)]">
               <div className="text-[11px] font-semibold text-[var(--color-ink-4)] uppercase tracking-wide mb-2">Versión</div>
               <div className="flex items-center gap-2">
                 <span className="text-[11.5px] font-mono text-[var(--color-ink-3)]">v1</span>
@@ -1454,14 +1693,19 @@ export function APIDocsPanel({ onClose }: { onClose: () => void }) {
           </nav>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto">
-            <div className={cn("px-8 py-7", section !== "endpoints" && "max-w-3xl mx-auto")}>
-              {section === "auth"      && <SectionAuth />}
-              {section === "endpoints" && <SectionEndpoints token={token} />}
-              {section === "webhooks"  && <SectionWebhooks />}
-              {section === "examples"  && <SectionExamples />}
-              {section === "consola"   && <SectionConsole />}
-            </div>
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            {section === "endpoints" ? (
+              <SectionEndpoints />
+            ) : (
+              <div className="flex-1 overflow-y-auto">
+                <div className="max-w-3xl mx-auto px-8 py-7">
+                  {section === "auth"     && <SectionAuth />}
+                  {section === "webhooks" && <SectionWebhooks />}
+                  {section === "examples" && <SectionExamples />}
+                  {section === "consola"  && <SectionConsole />}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
