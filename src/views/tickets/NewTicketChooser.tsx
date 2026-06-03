@@ -30,7 +30,7 @@ const OPTIONS: Option[] = [
     id: "transfer",
     icon: "⇄",
     label: "Transferencia interna",
-    desc: "Mover a una persona a otro hub, quiósco o manager. Sincroniza HubSpot y Slack automáticamente.",
+    desc: "Mover a una persona a otra región, quiósco o manager. Sincroniza HubSpot y Slack automáticamente.",
     color: "var(--color-green-700)",
     bg: "var(--color-mint-50)",
   },

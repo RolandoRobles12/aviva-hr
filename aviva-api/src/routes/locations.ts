@@ -8,13 +8,14 @@ const router = Router();
 // ── GET /locations ─────────────────────────────────────────────────────────────
 router.get("/", authenticate, requireScope("users:read"), async (req, res) => {
   try {
-    const { estado, status, producto, q, page = "1", limit = "50" } = req.query as Record<string, string>;
+    const { estado, status, producto, region, q, page = "1", limit = "50" } = req.query as Record<string, string>;
 
     let query: FirebaseFirestore.Query = db.collection("locations");
 
     if (estado)   query = query.where("estado",   "==", estado);
     if (status)   query = query.where("status",   "==", status);
     if (producto) query = query.where("producto", "==", producto);
+    if (region)   query = query.where("region",   "==", region);
 
     const snap = await query.get();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -12,9 +12,10 @@ export interface Location {
   catColor: string;
   catBg: string;
   gerente: string;
-  hub: string;
-  status: "open" | "vacant" | "closed";
+  region: string;
+  status: "open" | "closed";
   fechaApertura: string;
+  fechaCierre?: string;
   ubicacion?: string;
   determinante?: string;
   producto?: string;

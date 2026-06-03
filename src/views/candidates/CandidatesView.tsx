@@ -16,7 +16,7 @@ import { cn } from "@/lib/cn";
 
 // ── New Candidate Modal ────────────────────────────────────────────────────────
 function NewCandidateModal({ onClose }: { onClose: () => void }) {
-  const { hubs, estados } = useCatalog();
+  const { regions, estados } = useCatalog();
   const { appUser } = useAuth();
   const { notify } = useNotif();
   const [saving, setSaving] = useState(false);
@@ -24,7 +24,7 @@ function NewCandidateModal({ onClose }: { onClose: () => void }) {
   const [first,     setFirst]     = useState("");
   const [last,      setLast]      = useState("");
   const [position,  setPosition]  = useState("");
-  const [hub,       setHub]       = useState("");
+  const [region,    setRegion]    = useState("");
   const [quiosco,   setQuiosco]   = useState("");
   const [estado,    setEstado]    = useState("");
   const [recruiter, setRecruiter] = useState(appUser?.fullName ?? "");
@@ -41,7 +41,7 @@ function NewCandidateModal({ onClose }: { onClose: () => void }) {
       await createDoc("candidates", {
         first, last,
         fullName: `${first} ${last}`,
-        position, hub, quiosco, estado,
+        position, region, quiosco, estado,
         recruiter,
         email, phone,
         salary,
@@ -90,10 +90,10 @@ function NewCandidateModal({ onClose }: { onClose: () => void }) {
               <input className={inputClass} required value={position} onChange={(e) => setPosition(e.target.value)} placeholder="Ej. Promotor de campo" />
             </div>
             <div>
-              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Hub</label>
-              <select className={inputClass} value={hub} onChange={(e) => setHub(e.target.value)}>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Región</label>
+              <select className={inputClass} value={region} onChange={(e) => setRegion(e.target.value)}>
                 <option value="">Sin asignar</option>
-                {hubs.map((h) => <option key={h.id} value={h.id}>{h.label}</option>)}
+                {regions.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
               </select>
             </div>
             <div>
@@ -186,9 +186,9 @@ function StageProgress({ stage }: { stage: string }) {
 }
 
 function CandidateDetail({ candidate, onClose }: { candidate: Candidate; onClose: () => void }) {
-  const { stages, stageMeta, hubLabel, docTypes } = useCatalog();
-  const stage = stageMeta(candidate.stage);
-  const hub   = hubLabel(candidate.hub);
+  const { stages, stageMeta, regionLabel, docTypes } = useCatalog();
+  const stage  = stageMeta(candidate.stage);
+  const region = regionLabel(candidate.region);
 
   async function handleStageChange(newStage: string) {
     await updateCandidateStage((candidate as Candidate & { id: string }).id ?? "", newStage, candidate.fullName);
@@ -206,7 +206,7 @@ function CandidateDetail({ candidate, onClose }: { candidate: Candidate; onClose
 
         <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
           {[
-            ["Hub", hub],
+            ["Región", region],
             ["Ingreso", candidate.startDate ?? "—"],
             ["Salario", candidate.salary ?? "—"],
             ["Viterbit", candidate.viterbitId ?? "—"],

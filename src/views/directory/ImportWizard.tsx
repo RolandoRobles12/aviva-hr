@@ -8,7 +8,7 @@ import { createDoc } from "@/hooks/useFirestore";
 // "Antigüedad" and "Descripción" are intentionally omitted — calculated/unused.
 const TARGETS = [
   { id: "empresa",        label: "Empresa",              required: true,  hints: ["Empresa"] },
-  { id: "hub",            label: "Hub o equipo",         required: false, hints: ["Hub o equipo", "Hub equipo", "Equipo"] },
+  { id: "region",         label: "Región",               required: false, hints: ["Región", "Region", "Hub o equipo", "Hub equipo", "Equipo"] },
   { id: "quiosco",        label: "Quiósco",              required: false, hints: ["Quiosco", "Quiósco", "Kiosco"] },
   { id: "estado",         label: "Estado",               required: false, hints: ["Estado"] },
   { id: "fullName",       label: "Nombre completo",      required: true,  hints: ["Nombre completo", "Nombre y apellidos"] },
@@ -53,7 +53,7 @@ function parseCSV(text: string): string[][] {
 
 function downloadTemplate() {
   // Headers match the Aviva directory Google Sheets export column order exactly.
-  const csv = "Empresa,Hub o equipo,Quiosco,Estado,Nombre completo,No de colaborador,Puesto,Fecha de Ingreso,Antigüedad,Deal Owner,Hombre/Mujer,Tallas,Correo,Descripción,Área,Jefe Inmediato,HubSpot ID";
+  const csv = "Empresa,Región,Quiosco,Estado,Nombre completo,No de colaborador,Puesto,Fecha de Ingreso,Antigüedad,Deal Owner,Hombre/Mujer,Tallas,Correo,Descripción,Área,Jefe Inmediato,HubSpot ID";
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
   a.download = "plantilla-colaboradores-aviva.csv";
@@ -140,7 +140,7 @@ export function ImportWizard({ onClose, onImported }: Props) {
             email:          row.mapped.email        ?? "",
             role:           row.mapped.role         ?? "",
             empresa:        row.mapped.empresa      ?? "",
-            hub:            row.mapped.hub          ?? "",
+            region:         row.mapped.region        ?? "",
             quiosco:        row.mapped.quiosco      ?? "",
             estado:         row.mapped.estado       ?? "",
             area:           row.mapped.area         ?? "",
