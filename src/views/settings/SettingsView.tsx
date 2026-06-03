@@ -749,7 +749,16 @@ function SettingsRetention() {
 }
 
 // ── Webhooks & API ────────────────────────────────────────────────────────────
-const ALL_SCOPES = ["users:read", "users:write", "tickets:read", "audit:read", "events:write"];
+const ALL_SCOPES = [
+  { id: "users:read",        label: "Leer colaboradores",   desc: "GET /users, GET /users/:id" },
+  { id: "users:write",       label: "Crear y editar",       desc: "POST /users, PATCH /users/:id" },
+  { id: "users:delete",      label: "Iniciar bajas",        desc: "POST /users/:id/offboard" },
+  { id: "tickets:read",      label: "Leer tickets",         desc: "GET /tickets" },
+  { id: "tickets:write",     label: "Aprobar tickets",      desc: "POST /tickets/:id/approve" },
+  { id: "audit:read",        label: "Leer auditoría",       desc: "GET /audit" },
+  { id: "events:write",      label: "Enviar eventos",       desc: "Publicar hacia webhooks externos" },
+  { id: "integrations:read", label: "Ver integraciones",    desc: "GET /integrations, POST /integrations/:id/sync" },
+];
 
 const API_EVENTS = [
   { id: "users.created",      desc: "Se creó un colaborador." },
@@ -817,11 +826,22 @@ function NewApiKeyModal({ onClose }: { onClose: () => void }) {
               <label className="text-[12px] font-medium text-[var(--color-ink-2)] mb-2 block">Permisos (scopes)</label>
               <div className="space-y-1.5">
                 {ALL_SCOPES.map((s) => (
-                  <label key={s} className="flex items-center gap-2 text-[13px] cursor-pointer">
-                    <input type="checkbox" checked={scopes.includes(s)}
-                      onChange={(e) => setScopes(e.target.checked ? [...scopes, s] : scopes.filter((x) => x !== s))}
+                  <label key={s.id} className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors",
+                    scopes.includes(s.id)
+                      ? "border-green-300 bg-[var(--color-mint-50)]"
+                      : "border-[var(--color-line)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-2)]"
+                  )}>
+                    <input type="checkbox" checked={scopes.includes(s.id)}
+                      onChange={(e) => setScopes(e.target.checked ? [...scopes, s.id] : scopes.filter((x) => x !== s.id))}
                       className="cursor-pointer" />
-                    <code className="font-mono text-[12px]">{s}</code>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <code className="font-mono text-[11.5px] font-semibold text-green-700">{s.id}</code>
+                        <span className="text-[12.5px] font-medium text-[var(--color-ink-2)]">{s.label}</span>
+                      </div>
+                      <div className="text-[11px] text-[var(--color-ink-4)] mt-0.5">{s.desc}</div>
+                    </div>
                   </label>
                 ))}
               </div>
@@ -845,6 +865,68 @@ function NewApiKeyModal({ onClose }: { onClose: () => void }) {
             </div>
           </>
         )}
+      </div>
+    </>
+  );
+}
+
+function EditScopesModal({ apiKey, onClose }: { apiKey: ApiKeyDoc; onClose: () => void }) {
+  const { notify } = useNotif();
+  const [scopes, setScopes] = useState<string[]>(apiKey.scopes ?? []);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await updateDocById("apiKeys", apiKey.id, { scopes });
+      notify({ title: "Scopes actualizados", body: `Los permisos de "${apiKey.name}" fueron guardados.`, kind: "success" });
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[460px] rounded-[var(--radius-lg)] bg-[var(--color-surface)] shadow-[var(--shadow-lg)] p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-[14px] text-[var(--color-ink)]">Editar scopes</h3>
+            <p className="text-[12px] text-[var(--color-ink-3)] mt-0.5">{apiKey.name}</p>
+          </div>
+          <button onClick={onClose} className="p-1 rounded text-[var(--color-ink-3)] hover:bg-[var(--color-surface-2)]"><Close size={14} /></button>
+        </div>
+        <div>
+          <label className="text-[12px] font-medium text-[var(--color-ink-2)] mb-2 block">Permisos activos</label>
+          <div className="space-y-1.5">
+            {ALL_SCOPES.map((s) => (
+              <label key={s.id} className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors",
+                scopes.includes(s.id)
+                  ? "border-green-300 bg-[var(--color-mint-50)]"
+                  : "border-[var(--color-line)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-2)]"
+              )}>
+                <input type="checkbox" checked={scopes.includes(s.id)}
+                  onChange={(e) => setScopes(e.target.checked ? [...scopes, s.id] : scopes.filter((x) => x !== s.id))}
+                  className="cursor-pointer" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <code className="font-mono text-[11.5px] font-semibold text-green-700">{s.id}</code>
+                    <span className="text-[12.5px] font-medium text-[var(--color-ink-2)]">{s.label}</span>
+                  </div>
+                  <div className="text-[11px] text-[var(--color-ink-4)] mt-0.5">{s.desc}</div>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className="flex gap-2 justify-end pt-2">
+          <Button variant="secondary" onClick={onClose}>Cancelar</Button>
+          <Button variant="primary" onClick={handleSave} disabled={saving}>
+            {saving ? "Guardando…" : "Guardar scopes"}
+          </Button>
+        </div>
       </div>
     </>
   );
@@ -913,6 +995,7 @@ function SettingsWebhooks() {
   const [showNewKey,   setShowNewKey]   = useState(false);
   const [webhookModal, setWebhookModal] = useState<WebhookDoc | null | "new">(null);
   const [showDocs,     setShowDocs]     = useState(false);
+  const [editingKey,   setEditingKey]   = useState<ApiKeyDoc | null>(null);
 
   function copy(text: string, key: string) {
     navigator.clipboard?.writeText(text).catch(() => null);
@@ -957,7 +1040,7 @@ function SettingsWebhooks() {
                 <Button size="sm" variant="secondary" icon={<Copy size={12} />} onClick={() => copy(k.prefix, k.id)}>
                   {copied === k.id ? "¡Copiado!" : "Copiar"}
                 </Button>
-                <Button size="sm" variant="secondary" onClick={handleRotate}>Rotar</Button>
+                <Button size="sm" variant="secondary" onClick={() => setEditingKey(k as ApiKeyDoc)}>Editar scopes</Button>
                 <Button size="sm" variant="danger" onClick={() => handleRevoke(k.id)}>Revocar</Button>
               </div>
             </div>
@@ -1042,6 +1125,7 @@ function SettingsWebhooks() {
         />
       )}
       {showDocs && <APIDocsPanel onClose={() => setShowDocs(false)} />}
+      {editingKey && <EditScopesModal apiKey={editingKey} onClose={() => setEditingKey(null)} />}
     </>
   );
 }

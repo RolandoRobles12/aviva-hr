@@ -11,6 +11,15 @@ import integrationsRouter from "./routes/integrations";
 const app  = express();
 const PORT = process.env.PORT ?? 8080;
 
+// CORS — permite requests desde la consola del panel de documentación
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin",  "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+  if (req.method === "OPTIONS") { res.sendStatus(204); return; }
+  next();
+});
+
 app.use(express.json());
 
 // ── Público ────────────────────────────────────────────────────────────────────
@@ -23,7 +32,7 @@ app.get("/health", async (_req, res) => {
   }
 });
 
-// ── Rate limit global (aplica después de autenticar, antes de los handlers) ───
+// ── Rate limit global ──────────────────────────────────────────────────────────
 app.use("/hr/v1", rateLimit);
 
 // ── Rutas de la API ────────────────────────────────────────────────────────────
