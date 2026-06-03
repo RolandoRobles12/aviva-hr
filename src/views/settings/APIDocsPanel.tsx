@@ -928,7 +928,7 @@ function SectionEndpoints() {
                     <input
                       value={queryValues[p.name] ?? ""}
                       onChange={e => setQueryValues(prev => ({ ...prev, [p.name]: e.target.value }))}
-                      placeholder={p.type}
+                      placeholder={p.desc}
                       className="flex-1 h-7 px-2 rounded border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)] text-[11.5px] font-mono outline-none focus:border-green-400"
                     />
                   </div>
@@ -980,7 +980,7 @@ function SectionEndpoints() {
                 <span className="text-[12px] text-[var(--color-ink-3)]">{response.time} ms</span>
                 <div className="ml-auto"><CopyBtn text={response.body} /></div>
               </div>
-              <pre className="bg-[#0d1f1a] text-[#cfeede] px-4 py-3 font-mono text-[12.5px] leading-relaxed overflow-auto m-0 max-h-80 whitespace-pre">{response.body}</pre>
+              <pre className="bg-[#0d1f1a] text-[#cfeede] px-4 py-3 font-mono text-[12.5px] leading-relaxed overflow-auto m-0 whitespace-pre">{response.body}</pre>
             </div>
           )}
         </div>
