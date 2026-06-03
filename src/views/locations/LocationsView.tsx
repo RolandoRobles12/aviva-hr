@@ -5,10 +5,11 @@ import { useUsers } from "@/hooks/useUsers";
 import { LoadingView, ErrorView } from "@/components/ui/Spinner";
 import { Button } from "@/components/ui/Button";
 import { Drawer } from "@/components/ui/Drawer";
-import { Search, Plus, ChevronRight, Close } from "@/components/icons";
+import { Search, Plus, ChevronRight, Close, Upload } from "@/components/icons";
 import { cn } from "@/lib/cn";
 import { useCatalog } from "@/context/CatalogContext";
 import { useNotif } from "@/context/NotifContext";
+import { LocationImportWizard } from "./LocationImportWizard";
 
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
   open:   { label: "Activo",   color: "#026149", bg: "#e7f8ef" },
@@ -272,8 +273,9 @@ export function LocationsView() {
   const [estadoF,   setEstadoF]   = useState("all");
   const [statusF,   setStatusF]   = useState("all");
   const [productoF, setProductoF] = useState("all");
-  const [selected, setSelected] = useState<(Location & { id: string }) | null>(null);
-  const [locModal, setLocModal] = useState<(Location & { id: string }) | "new" | null>(null);
+  const [selected,   setSelected]   = useState<(Location & { id: string }) | null>(null);
+  const [locModal,   setLocModal]   = useState<(Location & { id: string }) | "new" | null>(null);
+  const [importing,  setImporting]  = useState(false);
 
   const filtered = useMemo(() => {
     const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -329,6 +331,7 @@ export function LocationsView() {
         </select>
         <div className="ml-auto flex items-center gap-2">
           <span className="text-[12px] text-[var(--color-ink-4)]">{filtered.length} locaciones</span>
+          <Button variant="secondary" size="sm" icon={<Upload size={13} />} onClick={() => setImporting(true)}>Importar</Button>
           <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={() => setLocModal("new")}>Nueva locación</Button>
         </div>
       </div>
@@ -390,6 +393,9 @@ export function LocationsView() {
       )}
       {locModal && (
         <LocationModal loc={locModal} onClose={() => setLocModal(null)} />
+      )}
+      {importing && (
+        <LocationImportWizard onClose={() => setImporting(false)} />
       )}
     </div>
   );
