@@ -7,6 +7,7 @@ import usersRouter        from "./routes/users";
 import ticketsRouter      from "./routes/tickets";
 import auditRouter        from "./routes/audit";
 import integrationsRouter from "./routes/integrations";
+import locationsRouter    from "./routes/locations";
 
 const app  = express();
 const PORT = process.env.PORT ?? 8080;
@@ -40,6 +41,7 @@ app.use("/hr/v1/users",        usersRouter);
 app.use("/hr/v1/tickets",      ticketsRouter);
 app.use("/hr/v1/audit",        auditRouter);
 app.use("/hr/v1/integrations", integrationsRouter);
+app.use("/hr/v1/locations",    locationsRouter);
 
 app.listen(PORT, () => {
   console.log(`Aviva HR API · http://localhost:${PORT}`);

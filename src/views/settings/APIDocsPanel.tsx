@@ -13,7 +13,7 @@ const CLOUD_URL = "https://aviva-api-101284022421.us-central1.run.app";
 
 const NAV: { id: Section; label: string; sub: string }[] = [
   { id: "auth",      label: "Autenticación",      sub: "API Keys · Scopes · Errores" },
-  { id: "endpoints", label: "Referencia REST",     sub: "11 endpoints documentados" },
+  { id: "endpoints", label: "Referencia REST",     sub: "12 endpoints documentados" },
   { id: "webhooks",  label: "Guía de Webhooks",   sub: "Firma HMAC · Reintentos" },
   { id: "examples",  label: "Ejemplos de código",  sub: "cURL · Node.js · Python" },
   { id: "consola",   label: "Consola",             sub: "Prueba el API en vivo" },
@@ -441,6 +441,39 @@ const ENDPOINTS = [
   "sync_id": "sync-20260603-xyz9",
   "status": "queued",
   "estimated_duration_s": 15
+}`,
+  },
+  {
+    method: "GET", path: "/locations", scope: "users:read",
+    desc: "Lista paginada de locaciones (quioscos, tiendas, corporativos). Soporta filtros por estado, estatus y producto.",
+    params: [
+      { name: "estado",   type: "string",  desc: "Estado de la república. Ej: Hidalgo" },
+      { name: "status",   type: "string",  desc: "open | vacant | closed" },
+      { name: "producto", type: "string",  desc: "Línea de producto. Ej: Aviva tu Compra" },
+      { name: "q",        type: "string",  desc: "Búsqueda libre en ciudad, código, gerente, nombre de pantalla." },
+      { name: "page",     type: "integer", desc: "Página (default: 1)." },
+      { name: "limit",    type: "integer", desc: "Resultados por página (default: 50, max: 200)." },
+    ],
+    response: `{
+  "data": [
+    {
+      "id": "loc-tulancingo-01",
+      "code": "HGO-001",
+      "ciudad": "Tulancingo",
+      "estado": "Hidalgo",
+      "ubicacion": "Plaza Central Tulancingo",
+      "producto": "Aviva tu Compra",
+      "catLabel": "Aviva tu Compra",
+      "catShort": "AtC",
+      "catColor": "#1b3f8a",
+      "catBg": "#e3eeff",
+      "gerente": "Adrián Contreras Zapata",
+      "hub": "Hub Hidalgo",
+      "status": "open",
+      "fechaApertura": "2024-03-15"
+    }
+  ],
+  "meta": { "page": 1, "limit": 50, "total": 34 }
 }`,
   },
 ];
