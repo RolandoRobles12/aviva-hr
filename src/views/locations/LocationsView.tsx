@@ -115,7 +115,7 @@ function LocationModal({
               <input className={inputClass} required value={ciudad} onChange={(e) => setCiudad(e.target.value)} placeholder="Ciudad de México" />
             </div>
             <div>
-              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Estado *</label>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Estado de la república *</label>
               <select className={inputClass} required value={estado} onChange={(e) => setEstado(e.target.value)}>
                 <option value="">Seleccionar…</option>
                 {estados.map((est) => <option key={est} value={est}>{est}</option>)}
@@ -264,17 +264,19 @@ function LocationDetail({
 export function LocationsView() {
   const { estados } = useCatalog();
   const { data: locations, loading, error } = useLocations();
-  const [query, setQuery]     = useState("");
-  const [estadoF, setEstadoF] = useState("all");
-  const [statusF, setStatusF] = useState("all");
+  const [query,     setQuery]     = useState("");
+  const [estadoF,   setEstadoF]   = useState("all");
+  const [statusF,   setStatusF]   = useState("all");
+  const [productoF, setProductoF] = useState("all");
   const [selected, setSelected] = useState<(Location & { id: string }) | null>(null);
   const [locModal, setLocModal] = useState<(Location & { id: string }) | "new" | null>(null);
 
   const filtered = useMemo(() => {
     const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
     return locations.filter((l) => {
-      if (estadoF !== "all" && l.estado !== estadoF) return false;
-      if (statusF !== "all" && l.status !== statusF) return false;
+      if (estadoF   !== "all" && l.estado   !== estadoF)   return false;
+      if (statusF   !== "all" && l.status   !== statusF)   return false;
+      if (productoF !== "all" && l.producto !== productoF) return false;
       if (query.trim()) {
         const q = norm(query);
         return (
@@ -286,7 +288,7 @@ export function LocationsView() {
       }
       return true;
     });
-  }, [locations, query, estadoF, statusF]);
+  }, [locations, query, estadoF, statusF, productoF]);
 
   if (loading) return <LoadingView />;
   if (error)   return <ErrorView message={error.message} />;
@@ -312,10 +314,15 @@ export function LocationsView() {
         </select>
         <select value={statusF} onChange={(e) => setStatusF(e.target.value)}
           className="h-8 px-2 text-[12.5px] rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-2)] outline-none">
-          <option value="all">Todos los estados</option>
+          <option value="all">Todos los estatus</option>
           <option value="open">Abierto</option>
           <option value="vacant">Sin cobertura</option>
           <option value="closed">Cerrado</option>
+        </select>
+        <select value={productoF} onChange={(e) => setProductoF(e.target.value)}
+          className="h-8 px-2 text-[12.5px] rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-2)] outline-none">
+          <option value="all">Todos los productos</option>
+          {Object.keys(CAT_MAP).map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
         <div className="ml-auto flex items-center gap-2">
           <span className="text-[12px] text-[var(--color-ink-4)]">{filtered.length} locaciones</span>
