@@ -4,17 +4,19 @@ import { Close, Copy, Check, Link, Shield, ExternalLink } from "@/components/ico
 import { cn } from "@/lib/cn";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type Section = "auth" | "endpoints" | "webhooks" | "examples";
+type Section = "auth" | "endpoints" | "webhooks" | "examples" | "consola";
 type Lang = "curl" | "node" | "python";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const BASE_URL = "https://api.avivacredito.com/hr/v1";
+const BASE_URL  = "https://api.avivacredito.com/hr/v1";
+const CLOUD_URL = "https://aviva-api-101284022421.us-central1.run.app";
 
 const NAV: { id: Section; label: string; sub: string }[] = [
   { id: "auth",      label: "Autenticación",      sub: "API Keys · Scopes · Errores" },
   { id: "endpoints", label: "Referencia REST",     sub: "11 endpoints documentados" },
   { id: "webhooks",  label: "Guía de Webhooks",   sub: "Firma HMAC · Reintentos" },
   { id: "examples",  label: "Ejemplos de código",  sub: "cURL · Node.js · Python" },
+  { id: "consola",   label: "Consola",             sub: "Prueba el API en vivo" },
 ];
 
 // ── Copy button ───────────────────────────────────────────────────────────────
@@ -443,10 +445,116 @@ const ENDPOINTS = [
   },
 ];
 
-function EndpointCard({ ep }: { ep: typeof ENDPOINTS[0] }) {
-  const [open, setOpen] = useState(false);
+// ── Body template generator ───────────────────────────────────────────────────
+function makeBodyTemplate(body: { name: string; type: string; req?: boolean }[]): string {
+  const obj: Record<string, unknown> = {};
+  for (const f of body) {
+    if (f.type === "boolean")  { obj[f.name] = false; continue; }
+    if (f.type === "string[]") { obj[f.name] = []; continue; }
+    if (f.type === "date")     { obj[f.name] = "YYYY-MM-DD"; continue; }
+    if (f.type === "integer")  { obj[f.name] = 0; continue; }
+    obj[f.name] = "";
+  }
+  return JSON.stringify(obj, null, 2);
+}
+
+// ── Code generator ────────────────────────────────────────────────────────────
+function buildCode(
+  lang: "curl" | "node" | "python",
+  method: string,
+  url: string,
+  token: string,
+  bodyText: string,
+): string {
+  const tk = token || "ak_live_xxxx_••••••••••••••••••••••••";
+  const hasBody = ["POST", "PATCH"].includes(method) && bodyText.trim();
+
+  if (lang === "curl") {
+    let s = method === "GET" ? `curl "${url}"` : `curl -X ${method} "${url}"`;
+    s += ` \\\n  -H "Authorization: Bearer ${tk}"`;
+    if (hasBody) {
+      s += ` \\\n  -H "Content-Type: application/json"`;
+      s += ` \\\n  -d '${bodyText}'`;
+    }
+    return s;
+  }
+  if (lang === "node") {
+    let s = `const res = await fetch(\n  "${url}",\n  {\n    method: "${method}",\n    headers: {\n      "Authorization": "Bearer ${tk}",`;
+    if (hasBody) s += `\n      "Content-Type": "application/json",`;
+    s += `\n    },`;
+    if (hasBody) s += `\n    body: JSON.stringify(${bodyText}),`;
+    s += `\n  }\n);\nconsole.log(await res.json());`;
+    return s;
+  }
+  // python
+  let s = `import requests\n\nr = requests.${method.toLowerCase()}(\n  "${url}",\n  headers={"Authorization": f"Bearer ${tk}"},`;
+  if (hasBody) s += `\n  json=${bodyText},`;
+  s += `\n)\nprint(r.json())`;
+  return s;
+}
+
+// ── Endpoint card ─────────────────────────────────────────────────────────────
+function EndpointCard({ ep, token }: { ep: typeof ENDPOINTS[0]; token: string }) {
+  const [open,        setOpen]        = useState(false);
+  const [lang,        setLang]        = useState<"curl" | "node" | "python">("curl");
+  const [pathValues,  setPathValues]  = useState<Record<string, string>>({});
+  const [queryValues, setQueryValues] = useState<Record<string, string>>({});
+  const [bodyText,    setBodyText]    = useState(() => ep.body ? makeBodyTemplate(ep.body) : "");
+  const [loading,     setLoading]     = useState(false);
+  const [response,    setResponse]    = useState<{ status: number; time: number; body: string } | null>(null);
+
+  const pathParamNames = ep.path.match(/:(\w+)/g)?.map(p => p.slice(1)) ?? [];
+
+  function buildUrl() {
+    let path = "/hr/v1" + ep.path;
+    for (const name of pathParamNames) {
+      path = path.replace(`:${name}`, encodeURIComponent(pathValues[name]?.trim() || `:${name}`));
+    }
+    const qs = Object.entries(queryValues)
+      .filter(([, v]) => v.trim())
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v.trim())}`)
+      .join("&");
+    return CLOUD_URL + path + (qs ? `?${qs}` : "");
+  }
+
+  async function sendRequest() {
+    if (!token) return;
+    setLoading(true);
+    setResponse(null);
+    const url = buildUrl();
+    const t0 = Date.now();
+    try {
+      const res = await fetch(url, {
+        method: ep.method,
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          ...(["POST", "PATCH"].includes(ep.method) ? { "Content-Type": "application/json" } : {}),
+        },
+        ...(["POST", "PATCH"].includes(ep.method) && bodyText.trim() ? { body: bodyText } : {}),
+      });
+      const time = Date.now() - t0;
+      let body = "";
+      try { body = JSON.stringify(await res.json(), null, 2); }
+      catch { body = await res.text(); }
+      setResponse({ status: res.status, time, body });
+    } catch (err) {
+      setResponse({ status: 0, time: Date.now() - t0, body: String(err) });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const statusBadge = response
+    ? response.status >= 200 && response.status < 300
+      ? "text-green-400 border-green-600 bg-green-900/30"
+      : response.status >= 400 && response.status < 500
+        ? "text-yellow-400 border-yellow-600 bg-yellow-900/30"
+        : "text-red-400 border-red-600 bg-red-900/30"
+    : "";
+
   return (
     <div className="border border-[var(--color-line)] rounded-lg overflow-hidden mb-3">
+      {/* Collapsed header */}
       <button
         className="w-full flex items-center gap-3 px-4 py-3 bg-[var(--color-surface)] hover:bg-[var(--color-surface-2)] transition-colors text-left"
         onClick={() => setOpen(!open)}
@@ -454,42 +562,163 @@ function EndpointCard({ ep }: { ep: typeof ENDPOINTS[0] }) {
         <MethodBadge method={ep.method} />
         <code className="font-mono text-[13px] text-[var(--color-ink)] flex-1">{ep.path}</code>
         <span className="font-mono text-[11px] text-[var(--color-ink-4)] px-1.5 py-0.5 rounded bg-[var(--color-surface-2)] border border-[var(--color-line)]">{ep.scope}</span>
-        <span className="text-[var(--color-ink-4)] text-[12px] ml-1">{open ? "▲" : "▼"}</span>
+        <span className="text-[12.5px] text-[var(--color-ink-3)] ml-2 truncate max-w-xs">{ep.desc}</span>
+        <span className="text-[var(--color-ink-4)] text-[12px] ml-2 shrink-0">{open ? "▲" : "▼"}</span>
       </button>
+
       {open && (
-        <div className="px-4 pb-4 pt-2 border-t border-[var(--color-line)] bg-[var(--color-bg)]">
-          <p className="text-[13px] text-[var(--color-ink-2)] mb-3">{ep.desc}</p>
-          {ep.params && ep.params.length > 0 && (
-            <div className="mb-3">
-              <div className="text-[12px] font-semibold text-[var(--color-ink-3)] uppercase tracking-wide mb-1">Query params</div>
-              <ParamsTable rows={ep.params} />
+        <div className="flex border-t border-[var(--color-line)]" style={{ minHeight: 320 }}>
+          {/* LEFT — docs */}
+          <div className="flex-1 px-5 py-5 bg-[var(--color-bg)] border-r border-[var(--color-line)] overflow-y-auto min-w-0">
+            <p className="text-[13px] text-[var(--color-ink-2)] mb-4 leading-relaxed">{ep.desc}</p>
+
+            {pathParamNames.length > 0 && (
+              <div className="mb-4">
+                <div className="text-[11.5px] font-semibold text-[var(--color-ink-3)] uppercase tracking-wide mb-2">Path params</div>
+                <ParamsTable rows={pathParamNames.map(name => ({ name, type: "string", req: true, desc: `ID del recurso — ej. ${name === "id" ? "u-385_02" : name}` }))} />
+              </div>
+            )}
+            {ep.params && ep.params.length > 0 && (
+              <div className="mb-4">
+                <div className="text-[11.5px] font-semibold text-[var(--color-ink-3)] uppercase tracking-wide mb-2">Query params</div>
+                <ParamsTable rows={ep.params} />
+              </div>
+            )}
+            {ep.body && ep.body.length > 0 && (
+              <div className="mb-4">
+                <div className="text-[11.5px] font-semibold text-[var(--color-ink-3)] uppercase tracking-wide mb-2">Request body (JSON)</div>
+                <ParamsTable rows={ep.body} />
+              </div>
+            )}
+            {ep.response && (
+              <div>
+                <div className="text-[11.5px] font-semibold text-[var(--color-ink-3)] uppercase tracking-wide mb-2">Respuesta 200</div>
+                <Code code={ep.response} />
+              </div>
+            )}
+          </div>
+
+          {/* RIGHT — Try It */}
+          <div className="w-[420px] shrink-0 bg-[#0d1f1a] flex flex-col overflow-hidden">
+            {/* Lang tabs */}
+            <div className="flex gap-0.5 px-3 pt-3 border-b border-[#ffffff15]">
+              {(["curl", "node", "python"] as const).map((l) => (
+                <button
+                  key={l}
+                  onClick={() => setLang(l)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-t text-[12px] font-medium transition-colors",
+                    lang === l ? "bg-[#1a2e28] text-white" : "text-white/40 hover:text-white/60"
+                  )}
+                >
+                  {l === "curl" ? "Shell" : l === "node" ? "Node.js" : "Python"}
+                </button>
+              ))}
             </div>
-          )}
-          {ep.body && ep.body.length > 0 && (
-            <div className="mb-3">
-              <div className="text-[12px] font-semibold text-[var(--color-ink-3)] uppercase tracking-wide mb-1">Request body (JSON)</div>
-              <ParamsTable rows={ep.body} />
+
+            {/* Path param inputs */}
+            {pathParamNames.length > 0 && (
+              <div className="px-3 py-2.5 border-b border-[#ffffff15] space-y-1.5">
+                <div className="text-[10px] text-white/40 uppercase tracking-widest font-semibold">Path</div>
+                {pathParamNames.map((name) => (
+                  <div key={name} className="flex items-center gap-2">
+                    <code className="text-[11px] text-[#cfeede]/60 w-16 shrink-0 font-mono">:{name}</code>
+                    <input
+                      value={pathValues[name] ?? ""}
+                      onChange={(e) => setPathValues((p) => ({ ...p, [name]: e.target.value }))}
+                      placeholder={name === "id" ? "u-385_02" : name}
+                      className="flex-1 h-7 px-2 rounded bg-[#1a2e28] border border-[#ffffff20] text-[#cfeede] text-[11.5px] font-mono outline-none focus:border-green-500"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Query param inputs */}
+            {ep.params && ep.params.length > 0 && (
+              <div className="px-3 py-2.5 border-b border-[#ffffff15] space-y-1.5">
+                <div className="text-[10px] text-white/40 uppercase tracking-widest font-semibold">Query params</div>
+                {ep.params.map((p) => (
+                  <div key={p.name} className="flex items-center gap-2">
+                    <code className="text-[11px] text-[#cfeede]/60 w-16 shrink-0 font-mono">{p.name}</code>
+                    <input
+                      value={queryValues[p.name] ?? ""}
+                      onChange={(e) => setQueryValues((prev) => ({ ...prev, [p.name]: e.target.value }))}
+                      placeholder={p.type}
+                      className="flex-1 h-7 px-2 rounded bg-[#1a2e28] border border-[#ffffff20] text-[#cfeede] text-[11.5px] font-mono outline-none focus:border-green-500"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Body editor */}
+            {["POST", "PATCH"].includes(ep.method) && ep.body && ep.body.length > 0 && (
+              <div className="px-3 py-2.5 border-b border-[#ffffff15]">
+                <div className="text-[10px] text-white/40 uppercase tracking-widest font-semibold mb-1.5">Body JSON</div>
+                <textarea
+                  value={bodyText}
+                  onChange={(e) => setBodyText(e.target.value)}
+                  rows={5}
+                  spellCheck={false}
+                  className="w-full px-2 py-2 rounded bg-[#1a2e28] border border-[#ffffff20] text-[#cfeede] text-[11.5px] font-mono outline-none resize-y focus:border-green-500"
+                />
+              </div>
+            )}
+
+            {/* Generated code */}
+            <div className="flex-1 overflow-auto min-h-0">
+              <div className="flex items-center justify-between px-3 pt-2.5 pb-1">
+                <span className="text-[10px] text-white/30 uppercase tracking-widest font-semibold">Código</span>
+                <CopyBtn text={buildCode(lang, ep.method, buildUrl(), token, bodyText)} />
+              </div>
+              <pre className="text-[#cfeede] px-3 pb-3 font-mono text-[11.5px] leading-relaxed whitespace-pre overflow-x-auto">
+                {buildCode(lang, ep.method, buildUrl(), token, bodyText)}
+              </pre>
             </div>
-          )}
-          {ep.response && (
-            <div>
-              <div className="text-[12px] font-semibold text-[var(--color-ink-3)] uppercase tracking-wide mb-1">Respuesta 200</div>
-              <Code code={ep.response} />
+
+            {/* Try It button + response */}
+            <div className="border-t border-[#ffffff15] p-3 space-y-2 shrink-0">
+              <button
+                disabled={!token || loading}
+                onClick={sendRequest}
+                className={cn(
+                  "w-full py-2 rounded-lg text-[13px] font-semibold transition-colors",
+                  token && !loading
+                    ? "bg-green-600 hover:bg-green-700 text-white"
+                    : "bg-[#1a2e28] text-white/30 cursor-not-allowed"
+                )}
+              >
+                {!token ? "↑ Agrega tu API Token en el sidebar" : loading ? "Enviando…" : "▶ Try It!"}
+              </button>
+
+              {response && (
+                <div className="rounded-lg overflow-hidden border border-[#ffffff15]">
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-[#1a2e28] border-b border-[#ffffff10]">
+                    <span className={cn("font-mono text-[11px] font-bold px-2 py-0.5 rounded border", statusBadge)}>
+                      {response.status === 0 ? "ERR" : response.status}
+                    </span>
+                    <span className="text-white/40 text-[11px]">{response.time} ms</span>
+                    <div className="ml-auto"><CopyBtn text={response.body} /></div>
+                  </div>
+                  <pre className="text-[#cfeede] px-3 py-2.5 font-mono text-[11px] leading-relaxed overflow-auto max-h-60 whitespace-pre">{response.body}</pre>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-function SectionEndpoints() {
+function SectionEndpoints({ token }: { token: string }) {
   return (
     <div>
       <H2>Referencia REST</H2>
-      <P>Base URL: <IC>{BASE_URL}</IC> · Todos los requests deben incluir <IC>Authorization: Bearer &lt;key&gt;</IC> y <IC>Content-Type: application/json</IC>.</P>
-      <Note>Los campos marcados con <span className="text-red-500 font-bold">*</span> son obligatorios. El resto son opcionales.</Note>
-      {ENDPOINTS.map((ep) => <EndpointCard key={ep.method + ep.path} ep={ep} />)}
+      <P>Base URL: <IC>{BASE_URL}</IC> · Todos los requests requieren <IC>Authorization: Bearer &lt;key&gt;</IC>.</P>
+      <Note>Los campos con <span className="text-red-500 font-bold">*</span> son obligatorios. Despliega cada endpoint para ver parámetros y probar en vivo.</Note>
+      {ENDPOINTS.map((ep) => <EndpointCard key={ep.method + ep.path} ep={ep} token={token} />)}
     </div>
   );
 }
@@ -834,10 +1063,305 @@ function SectionExamples() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// SECTION: Consola interactiva
+// ═══════════════════════════════════════════════════════════════════════════════
+type ConsoleEp = {
+  method: string; path: string; scope: string; desc: string;
+  pathParams?:  { name: string; placeholder: string }[];
+  queryParams?: { name: string; placeholder: string }[];
+  bodyTemplate?: string;
+};
+
+const CONSOLE_ENDPOINTS: ConsoleEp[] = [
+  {
+    method: "GET", path: "/hr/v1/users", scope: "users:read", desc: "Lista colaboradores",
+    queryParams: [
+      { name: "hub",    placeholder: "hub1-region_hidalgo" },
+      { name: "status", placeholder: "active | inactive | pending" },
+      { name: "q",      placeholder: "nombre o email" },
+      { name: "limit",  placeholder: "50" },
+    ],
+  },
+  {
+    method: "GET", path: "/hr/v1/users/:id", scope: "users:read", desc: "Detalle de colaborador",
+    pathParams: [{ name: "id", placeholder: "u-385_02" }],
+  },
+  {
+    method: "POST", path: "/hr/v1/users", scope: "users:write", desc: "Crear colaborador",
+    bodyTemplate: JSON.stringify({
+      num_colaborador: "385_02",
+      nombre: "Adrián Contreras Zapata",
+      email: "adrian.contreras@avivacredito.com",
+      puesto: "Kiosk Manager",
+      hub: "hub1-region_hidalgo",
+      estado: "Hidalgo",
+      fecha_ingreso: "2026-06-01",
+    }, null, 2),
+  },
+  {
+    method: "PATCH", path: "/hr/v1/users/:id", scope: "users:write", desc: "Editar colaborador",
+    pathParams: [{ name: "id", placeholder: "u-385_02" }],
+    bodyTemplate: JSON.stringify({ puesto: "Senior Kiosk Manager" }, null, 2),
+  },
+  {
+    method: "POST", path: "/hr/v1/users/:id/offboard", scope: "users:delete", desc: "Iniciar baja",
+    pathParams: [{ name: "id", placeholder: "u-385_02" }],
+    bodyTemplate: JSON.stringify({ reason: "renuncia_voluntaria", last_day: "2026-06-15" }, null, 2),
+  },
+  {
+    method: "GET", path: "/hr/v1/tickets", scope: "tickets:read", desc: "Lista tickets",
+    queryParams: [
+      { name: "type",   placeholder: "onboarding | offboarding" },
+      { name: "status", placeholder: "pending_approval | in_progress" },
+      { name: "limit",  placeholder: "50" },
+    ],
+  },
+  {
+    method: "POST", path: "/hr/v1/tickets/:id/approve", scope: "tickets:write", desc: "Aprobar ticket",
+    pathParams: [{ name: "id", placeholder: "TKT-2041" }],
+    bodyTemplate: JSON.stringify({ stage: "Manager directo", approver_id: "u-001" }, null, 2),
+  },
+  {
+    method: "GET", path: "/hr/v1/audit", scope: "audit:read", desc: "Log de auditoría",
+    queryParams: [
+      { name: "action", placeholder: "user_created" },
+      { name: "actor",  placeholder: "u-001" },
+      { name: "limit",  placeholder: "20" },
+    ],
+  },
+  {
+    method: "GET", path: "/hr/v1/integrations", scope: "integrations:read", desc: "Estado de integraciones",
+  },
+  {
+    method: "POST", path: "/hr/v1/integrations/:id/sync", scope: "integrations:read", desc: "Sincronizar integración",
+    pathParams: [{ name: "id", placeholder: "hubspot | slack | okta" }],
+  },
+];
+
+function SectionConsole() {
+  const [token,        setToken]        = useState("");
+  const [showToken,    setShowToken]    = useState(false);
+  const [epIdx,        setEpIdx]        = useState(0);
+  const [pathValues,   setPathValues]   = useState<Record<string, string>>({});
+  const [queryValues,  setQueryValues]  = useState<Record<string, string>>({});
+  const [bodyText,     setBodyText]     = useState(CONSOLE_ENDPOINTS[0].bodyTemplate ?? "");
+  const [loading,      setLoading]      = useState(false);
+  const [response,     setResponse]     = useState<{ status: number; time: number; body: string } | null>(null);
+
+  const ep = CONSOLE_ENDPOINTS[epIdx];
+
+  function selectEndpoint(idx: number) {
+    const next = CONSOLE_ENDPOINTS[idx];
+    setEpIdx(idx);
+    setPathValues({});
+    setQueryValues({});
+    setBodyText(next.bodyTemplate ?? "");
+    setResponse(null);
+  }
+
+  function buildUrl() {
+    let path = ep.path;
+    for (const [k, v] of Object.entries(pathValues)) {
+      path = path.replace(`:${k}`, encodeURIComponent(v.trim() || `:${k}`));
+    }
+    const qs = Object.entries(queryValues)
+      .filter(([, v]) => v.trim())
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v.trim())}`)
+      .join("&");
+    return CLOUD_URL + path + (qs ? `?${qs}` : "");
+  }
+
+  async function sendRequest() {
+    if (!token.trim()) return;
+    setLoading(true);
+    setResponse(null);
+    const url = buildUrl();
+    const t0 = Date.now();
+    try {
+      const res = await fetch(url, {
+        method: ep.method,
+        headers: {
+          "Authorization": `Bearer ${token.trim()}`,
+          ...(["POST", "PATCH"].includes(ep.method) ? { "Content-Type": "application/json" } : {}),
+        },
+        ...(["POST", "PATCH"].includes(ep.method) && bodyText.trim() ? { body: bodyText } : {}),
+      });
+      const time = Date.now() - t0;
+      let body = "";
+      try { body = JSON.stringify(await res.json(), null, 2); }
+      catch { body = await res.text(); }
+      setResponse({ status: res.status, time, body });
+    } catch (err) {
+      setResponse({ status: 0, time: Date.now() - t0, body: String(err) });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const statusColor = response
+    ? response.status >= 200 && response.status < 300
+      ? "bg-[var(--color-mint-50)] text-green-700 border-green-200"
+      : response.status >= 400 && response.status < 500
+        ? "bg-[#fff3d6] text-[#8a5a00] border-[#f5d87a]"
+        : "bg-[var(--color-danger-bg,#ffe4e4)] text-[var(--color-danger-fg,#a00)] border-red-200"
+    : "";
+
+  return (
+    <div>
+      <H2>Consola interactiva</H2>
+      <P>Prueba los endpoints con tu API Key real. Las peticiones van directamente al servidor Cloud Run de Aviva HR.</P>
+      <Warn>Esta consola llama al API en <strong>producción</strong>. Los POST y PATCH crean o modifican datos reales.</Warn>
+
+      {/* Token */}
+      <div className="mb-5">
+        <label className="text-[12px] font-medium text-[var(--color-ink-2)] mb-1.5 block">API Token</label>
+        <div className="flex gap-2">
+          <input
+            type={showToken ? "text" : "password"}
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+            placeholder="ak_live_xxxx_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            className="flex-1 h-9 px-3 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)] text-[12.5px] font-mono outline-none focus:border-green-400"
+          />
+          <button
+            onClick={() => setShowToken((v) => !v)}
+            className="px-3 h-9 rounded-[var(--radius-sm)] border border-[var(--color-line)] text-[12px] text-[var(--color-ink-3)] hover:bg-[var(--color-surface-2)] transition-colors"
+          >
+            {showToken ? "Ocultar" : "Mostrar"}
+          </button>
+        </div>
+      </div>
+
+      {/* Endpoint selector */}
+      <div className="mb-4">
+        <label className="text-[12px] font-medium text-[var(--color-ink-2)] mb-1.5 block">Endpoint</label>
+        <div className="flex flex-col gap-1.5">
+          {CONSOLE_ENDPOINTS.map((e, i) => (
+            <button
+              key={i}
+              onClick={() => selectEndpoint(i)}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left transition-colors",
+                i === epIdx
+                  ? "border-green-300 bg-[var(--color-mint-50)]"
+                  : "border-[var(--color-line)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-2)]"
+              )}
+            >
+              <MethodBadge method={e.method} />
+              <code className="font-mono text-[12px] text-[var(--color-ink)] flex-1">{e.path}</code>
+              <span className="text-[11.5px] text-[var(--color-ink-4)] shrink-0">{e.desc}</span>
+              <span className="font-mono text-[10.5px] text-[var(--color-ink-4)] px-1 py-0.5 rounded bg-[var(--color-surface-2)] border border-[var(--color-line)] shrink-0">{e.scope}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Path params */}
+      {ep.pathParams && ep.pathParams.length > 0 && (
+        <div className="mb-4 p-4 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-line)]">
+          <div className="text-[11.5px] font-semibold text-[var(--color-ink-3)] uppercase tracking-wide mb-2">Parámetros de ruta</div>
+          <div className="space-y-2">
+            {ep.pathParams.map((p) => (
+              <div key={p.name} className="flex items-center gap-3">
+                <IC>:{p.name}</IC>
+                <input
+                  value={pathValues[p.name] ?? ""}
+                  onChange={(e) => setPathValues((prev) => ({ ...prev, [p.name]: e.target.value }))}
+                  placeholder={p.placeholder}
+                  className="flex-1 h-8 px-3 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)] text-[12.5px] font-mono outline-none focus:border-green-400"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Query params */}
+      {ep.queryParams && ep.queryParams.length > 0 && (
+        <div className="mb-4 p-4 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-line)]">
+          <div className="text-[11.5px] font-semibold text-[var(--color-ink-3)] uppercase tracking-wide mb-2">Query params <span className="normal-case font-normal text-[var(--color-ink-4)]">(dejar vacío para omitir)</span></div>
+          <div className="grid grid-cols-2 gap-2">
+            {ep.queryParams.map((p) => (
+              <div key={p.name} className="flex items-center gap-2">
+                <span className="text-[11.5px] font-mono text-[var(--color-ink-3)] w-20 shrink-0">{p.name}</span>
+                <input
+                  value={queryValues[p.name] ?? ""}
+                  onChange={(e) => setQueryValues((prev) => ({ ...prev, [p.name]: e.target.value }))}
+                  placeholder={p.placeholder}
+                  className="flex-1 h-7 px-2 rounded border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)] text-[11.5px] font-mono outline-none focus:border-green-400"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Body editor */}
+      {["POST", "PATCH"].includes(ep.method) && (
+        <div className="mb-4">
+          <div className="text-[11.5px] font-semibold text-[var(--color-ink-3)] uppercase tracking-wide mb-1.5">Request body (JSON)</div>
+          <textarea
+            value={bodyText}
+            onChange={(e) => setBodyText(e.target.value)}
+            rows={8}
+            spellCheck={false}
+            className="w-full px-3 py-2.5 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[#0d1f1a] text-[#cfeede] text-[12.5px] font-mono outline-none resize-y focus:border-green-500"
+          />
+        </div>
+      )}
+
+      {/* URL preview + send */}
+      <div className="flex items-center gap-3 mb-5">
+        <div className="flex-1 flex items-center gap-2 px-3 h-9 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface-2)] overflow-hidden min-w-0">
+          <MethodBadge method={ep.method} />
+          <code className="font-mono text-[11px] text-[var(--color-ink-3)] truncate">{buildUrl()}</code>
+        </div>
+        <button
+          disabled={!token.trim() || loading}
+          onClick={sendRequest}
+          className={cn(
+            "shrink-0 h-9 px-5 rounded-[var(--radius-sm)] font-semibold text-[13px] transition-colors",
+            token.trim() && !loading
+              ? "bg-green-600 hover:bg-green-700 text-white"
+              : "bg-[var(--color-line)] text-[var(--color-ink-4)] cursor-not-allowed"
+          )}
+        >
+          {loading ? "Enviando…" : "Enviar →"}
+        </button>
+      </div>
+
+      {/* Response */}
+      {response && (
+        <div className="rounded-lg overflow-hidden border border-[var(--color-line)]">
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-[var(--color-surface)] border-b border-[var(--color-line)]">
+            <span className={cn("text-[12px] font-bold font-mono px-2.5 py-0.5 rounded border", statusColor)}>
+              {response.status === 0 ? "ERROR" : response.status}
+            </span>
+            <span className="text-[12px] text-[var(--color-ink-3)]">{response.time} ms</span>
+            <div className="ml-auto">
+              <CopyBtn text={response.body} />
+            </div>
+          </div>
+          <pre className="bg-[#0d1f1a] text-[#cfeede] px-4 py-3 font-mono text-[12.5px] leading-relaxed overflow-auto m-0 max-h-96 whitespace-pre">{response.body}</pre>
+        </div>
+      )}
+
+      {!token.trim() && (
+        <p className="text-[12px] text-[var(--color-ink-4)] text-center mt-4">
+          Pega tu API Token arriba y selecciona un endpoint para empezar.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // MAIN PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
 export function APIDocsPanel({ onClose }: { onClose: () => void }) {
-  const [section, setSection] = useState<Section>("auth");
+  const [section,   setSection]   = useState<Section>("auth");
+  const [token,     setToken]     = useState("");
+  const [showToken, setShowToken] = useState(false);
 
   return (
     <>
@@ -892,25 +1416,51 @@ export function APIDocsPanel({ onClose }: { onClose: () => void }) {
               </button>
             ))}
 
-            <div className="mx-4 mt-6 pt-4 border-t border-[var(--color-line)]">
+            <div className="mx-4 mt-4 pt-4 border-t border-[var(--color-line)]">
+              <div className="text-[11px] font-semibold text-[var(--color-ink-4)] uppercase tracking-wide mb-2">API Token</div>
+              <div className="relative">
+                <input
+                  type={showToken ? "text" : "password"}
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                  placeholder="ak_live_…"
+                  className="w-full h-7 pl-2 pr-12 rounded border border-[var(--color-line)] bg-[var(--color-surface-2)] text-[var(--color-ink)] text-[11px] font-mono outline-none focus:border-green-400"
+                />
+                <button
+                  onClick={() => setShowToken((v) => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[var(--color-ink-4)] hover:text-[var(--color-ink-2)]"
+                >
+                  {showToken ? "ocultar" : "ver"}
+                </button>
+              </div>
+              {token && (
+                <div className="mt-1.5 flex items-center gap-1.5">
+                  <span className="size-1.5 rounded-full bg-green-500 shrink-0" />
+                  <span className="text-[10.5px] text-green-700 font-medium">Token activo — Try It! habilitado</span>
+                </div>
+              )}
+            </div>
+
+            <div className="mx-4 mt-4 pt-4 border-t border-[var(--color-line)]">
               <div className="text-[11px] font-semibold text-[var(--color-ink-4)] uppercase tracking-wide mb-2">Versión</div>
               <div className="flex items-center gap-2">
                 <span className="text-[11.5px] font-mono text-[var(--color-ink-3)]">v1</span>
                 <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--color-mint-50)] text-green-700 font-medium">Estable</span>
               </div>
               <div className="text-[11px] text-[var(--color-ink-4)] mt-3 leading-relaxed">
-                Soporte: <a href="mailto:tech@avivacredito.com" className="text-green-700 hover:underline">tech@avivacredito.com</a>
+                Soporte: <a href="mailto:rolando.robles@avivacredito.com" className="text-green-700 hover:underline">rolando.robles@avivacredito.com</a>
               </div>
             </div>
           </nav>
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto">
-            <div className="max-w-3xl mx-auto px-8 py-7">
+            <div className={cn("px-8 py-7", section !== "endpoints" && "max-w-3xl mx-auto")}>
               {section === "auth"      && <SectionAuth />}
-              {section === "endpoints" && <SectionEndpoints />}
+              {section === "endpoints" && <SectionEndpoints token={token} />}
               {section === "webhooks"  && <SectionWebhooks />}
               {section === "examples"  && <SectionExamples />}
+              {section === "consola"   && <SectionConsole />}
             </div>
           </div>
         </div>
