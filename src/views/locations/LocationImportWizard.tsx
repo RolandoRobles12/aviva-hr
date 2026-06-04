@@ -4,29 +4,44 @@ import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { createDoc } from "@/hooks/useFirestore";
 
-// Columns match the exact headers used in the Aviva Sheets directory export.
-// "Antigüedad" and "Descripción" are intentionally omitted — calculated/unused.
+// ── CAT_MAP (must match LocationsView) ────────────────────────────────────────
+const CAT_MAP: Record<string, { label: string; short: string; color: string; bg: string }> = {
+  "Aviva tu Compra":      { label: "Aviva tu Compra",      short: "AtC", color: "#1b3f8a", bg: "#e3eeff" },
+  "Aviva tu Negocio":     { label: "Aviva tu Negocio",     short: "AtN", color: "#026149", bg: "#e7f8ef" },
+  "Casa Marchand":        { label: "Casa Marchand",        short: "CM",  color: "#5c2e8e", bg: "#ece2f5" },
+  "Aviva tu Compra · BA": { label: "Aviva tu Compra · BA", short: "BA",  color: "#8a5a00", bg: "#fff3d6" },
+  "Corporativo":          { label: "Corporativo",          short: "Corp",color: "#3a3a3a", bg: "#f1f1ee" },
+};
+const DEFAULT_CAT = { label: "Quiósco", short: "Q", color: "#1b3f8a", bg: "#e3eeff" };
+
+function getCatFields(producto: string, categoria: string) {
+  return CAT_MAP[producto] ?? CAT_MAP[categoria] ?? DEFAULT_CAT;
+}
+
+function mapStatus(raw: string): "open" | "closed" {
+  const v = (raw ?? "").trim().toLowerCase();
+  if (v === "activo" || v === "active" || v === "open" || v === "abierto") return "open";
+  return "closed";
+}
+
+// ── Columns ────────────────────────────────────────────────────────────────────
 const TARGETS = [
-  { id: "empresa",        label: "Empresa",              required: true,  hints: ["Empresa"] },
-  { id: "region",         label: "Región",               required: false, hints: ["Región", "Region", "Hub o equipo", "Hub equipo", "Equipo"] },
-  { id: "quiosco",        label: "Quiósco",              required: false, hints: ["Quiosco", "Quiósco", "Kiosco"] },
-  { id: "estado",         label: "Estado",               required: false, hints: ["Estado"] },
-  { id: "fullName",       label: "Nombre completo",      required: true,  hints: ["Nombre completo", "Nombre y apellidos"] },
-  { id: "numColaborador", label: "No de colaborador",    required: true,  hints: ["No de colaborador", "Número colaborador", "Num colaborador"] },
-  { id: "role",           label: "Puesto",               required: true,  hints: ["Puesto", "Cargo"] },
-  { id: "hiredAt",        label: "Fecha de ingreso",     required: false, hints: ["Fecha de Ingreso", "Fecha ingreso"] },
-  { id: "dealOwner",      label: "Deal Owner",           required: false, hints: ["Deal Owner", "Deal owner"] },
-  { id: "genero",         label: "Hombre/Mujer",         required: false, hints: ["Hombre/Mujer", "Género", "Genero"] },
-  { id: "talla",          label: "Tallas",               required: false, hints: ["Tallas", "Talla"] },
-  { id: "email",          label: "Correo",               required: true,  hints: ["Correo", "Email", "E-mail"] },
-  { id: "area",           label: "Área",                 required: false, hints: ["Área", "Area"] },
-  { id: "managerName",    label: "Jefe Inmediato",       required: false, hints: ["Jefe Inmediato", "Jefe inmediato", "Supervisor"] },
-  { id: "hubspot",        label: "HubSpot ID",           required: false, hints: ["HubSpot ID", "Hubspot ID"] },
-  { id: "phone",          label: "Teléfono",             required: false, hints: ["Teléfono", "WhatsApp", "Celular"] },
+  { id: "code",          label: "No. / Código",          required: true,  hints: ["NO", "Código", "Num", "Número", "Clave"] },
+  { id: "ciudad",        label: "Ciudad",                required: true,  hints: ["Ciudad", "CIUDAD"] },
+  { id: "estado",        label: "Estado de la república",required: true,  hints: ["Estado", "ESTADO"] },
+  { id: "ubicacion",     label: "Nombre de pantalla",    required: false, hints: ["UBICACION", "Ubicacion", "Ubicación", "Nombre"] },
+  { id: "direccion",     label: "Dirección",             required: false, hints: ["DIRECCION", "Dirección", "Direccion"] },
+  { id: "producto",      label: "Producto",              required: false, hints: ["PRODUCTO", "Producto", "Línea"] },
+  { id: "categoria",     label: "Categoría",             required: false, hints: ["CATEGORIA", "Categoría", "Categoria"] },
+  { id: "determinante",  label: "Determinante",          required: false, hints: ["DETERMINANTE", "Determinante"] },
+  { id: "status",        label: "Estatus",               required: false, hints: ["ESTATUS", "Estatus", "Status"] },
+  { id: "fechaApertura", label: "Fecha de apertura",     required: false, hints: ["FECHA DE APERTUA", "FECHA APERTURA", "Fecha de apertura", "Apertura"] },
+  { id: "fechaCierre",   label: "Fecha de cierre",       required: false, hints: ["FECHA DE CIERRE", "Fecha de cierre", "Cierre"] },
 ] as const;
 
 type TargetId = (typeof TARGETS)[number]["id"];
 
+// ── CSV parser (same as ImportWizard) ─────────────────────────────────────────
 function parseCSV(text: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
@@ -52,11 +67,10 @@ function parseCSV(text: string): string[][] {
 }
 
 function downloadTemplate() {
-  // Headers match the Aviva directory Google Sheets export column order exactly.
-  const csv = "Empresa,Región,Quiosco,Estado,Nombre completo,No de colaborador,Puesto,Fecha de Ingreso,Antigüedad,Deal Owner,Hombre/Mujer,Tallas,Correo,Descripción,Área,Jefe Inmediato,HubSpot ID";
+  const csv = "NO,ESTADO,CATEGORIA,DETERMINANTE,CIUDAD,ESTATUS,FECHA DE APERTUA,ANTIGUEDAD,FECHA DE CIERRE,UBICACION,DIRECCION,PRODUCTO";
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-  a.download = "plantilla-colaboradores-aviva.csv";
+  a.download = "plantilla-locaciones-aviva.csv";
   a.click();
 }
 
@@ -67,15 +81,15 @@ interface Props {
   onImported?: (result: { ok: number; warn: number; err: number; total: number }) => void;
 }
 
-export function ImportWizard({ onClose, onImported }: Props) {
-  const [step, setStep]               = useState(0);
-  const [file, setFile]               = useState<File | null>(null);
-  const [parsedRows, setParsedRows]   = useState<string[][]>([]);
-  const [headers, setHeaders]         = useState<string[]>([]);
-  const [mapping, setMapping]         = useState<Partial<Record<TargetId, number>>>({});
-  const [dragOver, setDragOver]       = useState(false);
-  const [importing, setImporting]     = useState(false);
-  const fileInputRef                  = useRef<HTMLInputElement>(null);
+export function LocationImportWizard({ onClose, onImported }: Props) {
+  const [step, setStep]             = useState(0);
+  const [file, setFile]             = useState<File | null>(null);
+  const [parsedRows, setParsedRows] = useState<string[][]>([]);
+  const [headers, setHeaders]       = useState<string[]>([]);
+  const [mapping, setMapping]       = useState<Partial<Record<TargetId, number>>>({});
+  const [dragOver, setDragOver]     = useState(false);
+  const [importing, setImporting]   = useState(false);
+  const fileInputRef                = useRef<HTMLInputElement>(null);
 
   function handleFile(f: File) {
     setFile(f);
@@ -106,7 +120,7 @@ export function ImportWizard({ onClose, onImported }: Props) {
     if (!parsedRows.length) return { ok: 0, warn: 0, err: 0, rows: [], total: 0 };
     const requiredIds = TARGETS.filter((t) => t.required).map((t) => t.id);
     let ok = 0, warn = 0, err = 0;
-    const rows = parsedRows.slice(0, 50).map((r, idx) => {
+    const rows = parsedRows.slice(0, 100).map((r, idx) => {
       const issues: { kind: "ok" | "warn" | "err"; msg: string }[] = [];
       const mapped: Partial<Record<TargetId, string>> = {};
       TARGETS.forEach((t) => {
@@ -117,6 +131,12 @@ export function ImportWizard({ onClose, onImported }: Props) {
       requiredIds.forEach((rid) => {
         if (!mapped[rid as TargetId]) issues.push({ kind: "err", msg: `Falta ${rid}` });
       });
+      if (!mapped.producto && !mapped.categoria) {
+        issues.push({ kind: "warn", msg: "Sin producto/categoría — se usará Quiósco" });
+      }
+      if (!mapped.fechaApertura) {
+        issues.push({ kind: "warn", msg: "Sin fecha de apertura" });
+      }
       const sev = issues.some((i) => i.kind === "err") ? "err" : issues.some((i) => i.kind === "warn") ? "warn" : "ok";
       if (sev === "err") err++; else if (sev === "warn") warn++; else ok++;
       return { idx, mapped, issues, sev };
@@ -127,37 +147,30 @@ export function ImportWizard({ onClose, onImported }: Props) {
   async function doImport() {
     setImporting(true);
     try {
-      const toImport = validation.rows.filter(r => r.sev !== "err");
+      const toImport = validation.rows.filter((r) => r.sev !== "err");
       await Promise.all(
-        toImport.map(row => {
-          const name = (row.mapped.fullName ?? "").trim();
-          const parts = name.split(" ");
-          return createDoc("users", {
-            numColaborador: row.mapped.numColaborador ?? "",
-            fullName:       name,
-            first:          parts[0] ?? "",
-            last:           parts.slice(1).join(" "),
-            email:          row.mapped.email        ?? "",
-            role:           row.mapped.role         ?? "",
-            empresa:        row.mapped.empresa      ?? "",
-            region:         row.mapped.region        ?? "",
-            quiosco:        row.mapped.quiosco      ?? "",
-            estado:         row.mapped.estado       ?? "",
-            area:           row.mapped.area         ?? "",
-            managerName:    row.mapped.managerName  ?? null,
-            manager:        null,
-            hiredAt:        row.mapped.hiredAt      ?? new Date().toISOString().slice(0, 10),
-            dealOwner:      (row.mapped.dealOwner ?? "").toUpperCase() === "TRUE",
-            genero:         (row.mapped.genero ?? "") as "H" | "M",
-            talla:          row.mapped.talla        ?? "",
-            phone:          row.mapped.phone        ?? "",
-            hubspot:        row.mapped.hubspot      || null,
-            status:         "invited",
-            access:         [],
-            tablets:        [],
-            laptop:         null,
-            hireMonths:     0,
-            avatar:         { initials: (name[0] ?? "?").toUpperCase(), color: "c1" },
+        toImport.map((row) => {
+          const producto  = row.mapped.producto  ?? "";
+          const categoria = row.mapped.categoria ?? "";
+          const cat       = getCatFields(producto, categoria);
+          return createDoc("locations", {
+            code:          row.mapped.code          ?? "",
+            ciudad:        row.mapped.ciudad        ?? "",
+            estado:        row.mapped.estado        ?? "",
+            ubicacion:     row.mapped.ubicacion     ?? "",
+            direccion:     row.mapped.direccion     ?? "",
+            producto,
+            determinante:  row.mapped.determinante  ?? "",
+            fechaApertura: row.mapped.fechaApertura ?? "",
+            fechaCierre:   row.mapped.fechaCierre   ?? "",
+            status:        mapStatus(row.mapped.status ?? "Activo"),
+            gerente:       "",
+            region:        "",
+            categoria:     producto || categoria,
+            catLabel:      cat.label,
+            catShort:      cat.short,
+            catColor:      cat.color,
+            catBg:         cat.bg,
           });
         })
       );
@@ -172,12 +185,13 @@ export function ImportWizard({ onClose, onImported }: Props) {
     <>
       <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
       <div className="fixed inset-x-4 top-1/2 z-50 -translate-y-1/2 mx-auto w-full max-w-[960px] rounded-[var(--radius-lg)] bg-[var(--color-surface)] shadow-[var(--shadow-lg)] overflow-hidden flex flex-col max-h-[92vh]">
+
         {/* Header */}
         <div className="flex items-start justify-between px-6 py-4 border-b border-[var(--color-line)] shrink-0">
           <div>
-            <div className="font-semibold text-[15px] text-[var(--color-ink)]">Importar colaboradores</div>
+            <div className="font-semibold text-[15px] text-[var(--color-ink)]">Importar locaciones</div>
             <div className="text-[12px] text-[var(--color-ink-3)] mt-0.5">
-              Sube un CSV y Aviva HR creará o actualizará las cuentas automáticamente.
+              Sube un CSV con tu base de puntos de venta. Gerente y región se asignan después.
             </div>
           </div>
           <button onClick={onClose} className="p-1 rounded-md text-[var(--color-ink-3)] hover:bg-[var(--color-surface-2)] transition-colors">
@@ -194,7 +208,7 @@ export function ImportWizard({ onClose, onImported }: Props) {
               )}>
                 <span className={cn("size-6 rounded-full grid place-items-center text-[11px] font-bold",
                   i === step ? "bg-green-500 text-white"
-                  : i < step ? "bg-green-100 text-green-700"
+                  : i < step  ? "bg-green-100 text-green-700"
                   : "bg-[var(--color-line)] text-[var(--color-ink-3)]"
                 )}>
                   {i < step ? <Check size={12} /> : i + 1}
@@ -208,6 +222,7 @@ export function ImportWizard({ onClose, onImported }: Props) {
 
         {/* Body */}
         <div className="flex-1 overflow-auto p-6">
+
           {/* Step 0: Upload */}
           {step === 0 && (
             <div className="space-y-5">
@@ -224,13 +239,8 @@ export function ImportWizard({ onClose, onImported }: Props) {
                 <Upload size={28} className="mx-auto mb-3 text-[var(--color-ink-3)]" />
                 <div className="font-semibold text-[15px] text-[var(--color-ink)]">Arrastra tu archivo aquí</div>
                 <div className="text-[13px] text-[var(--color-ink-3)] mt-1">o haz clic para seleccionar · CSV hasta 5 MB</div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".csv,.xlsx,.xls"
-                  className="hidden"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
-                />
+                <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -240,7 +250,7 @@ export function ImportWizard({ onClose, onImported }: Props) {
                   </div>
                   <div>
                     <div className="font-semibold text-[13px] text-[var(--color-ink)]">¿Primera vez?</div>
-                    <div className="text-[12px] text-[var(--color-ink-3)] mt-0.5">Descarga la plantilla con todas las columnas que esperamos.</div>
+                    <div className="text-[12px] text-[var(--color-ink-3)] mt-0.5">Descarga la plantilla con las columnas esperadas.</div>
                     <Button size="sm" variant="secondary" className="mt-2" onClick={(e) => { e.stopPropagation(); downloadTemplate(); }}>
                       Descargar plantilla
                     </Button>
@@ -251,19 +261,21 @@ export function ImportWizard({ onClose, onImported }: Props) {
                     <Warn size={16} />
                   </div>
                   <div>
-                    <div className="font-semibold text-[13px] text-[var(--color-ink)]">¿Vienes de Humand o un Excel viejo?</div>
-                    <div className="text-[12px] text-[var(--color-ink-3)] mt-0.5">No te preocupes por el nombre de las columnas. Te ayudamos a mapearlas.</div>
+                    <div className="font-semibold text-[13px] text-[var(--color-ink)]">¿Vienes de un Excel existente?</div>
+                    <div className="text-[12px] text-[var(--color-ink-3)] mt-0.5">
+                      El formato flexible detecta columnas automáticamente. Podrás ajustar el mapeo antes de importar.
+                    </div>
                   </div>
                 </div>
               </div>
 
               <div>
-                <div className="font-semibold text-[13px] text-[var(--color-ink)] mb-2">Lo que haremos al importar:</div>
+                <div className="font-semibold text-[13px] text-[var(--color-ink)] mb-2">Notas del import:</div>
                 <ul className="space-y-1.5 text-[13px] text-[var(--color-ink-2)] list-disc list-inside">
-                  <li>Crear las cuentas nuevas como <b>Invitadas</b>, listas para SSO.</li>
-                  <li>Si un email ya existe, <b>actualizar</b> los datos (sin duplicar).</li>
-                  <li>Provisionar Google Workspace, Slack, Okta, HubSpot y Aviva Flat según el puesto.</li>
-                  <li>Registrar cada cambio en el log de auditoría.</li>
+                  <li>El producto determina la categoría visual de la locación (color, ícono).</li>
+                  <li>Estatus "Activo" se mapea a <b>Activo</b>; cualquier otro valor a <b>Inactivo</b>.</li>
+                  <li>Gerente y región se dejan vacíos — se asignan después desde la vista de locaciones.</li>
+                  <li>Si el archivo ya tiene los encabezados del formato Aviva, el mapeo es automático.</li>
                 </ul>
               </div>
             </div>
@@ -273,7 +285,8 @@ export function ImportWizard({ onClose, onImported }: Props) {
           {step === 1 && (
             <div>
               <p className="text-[13px] text-[var(--color-ink-3)] mb-4">
-                Archivo: <b className="text-[var(--color-ink)]">{file?.name}</b> · {parsedRows.length} filas detectadas. Mapea cada campo al encabezado del CSV.
+                Archivo: <b className="text-[var(--color-ink)]">{file?.name}</b> · {parsedRows.length} filas detectadas.
+                Verifica que cada campo apunte al encabezado correcto del CSV.
               </p>
               <div className="grid grid-cols-2 gap-3">
                 {TARGETS.map((t) => (
@@ -303,9 +316,9 @@ export function ImportWizard({ onClose, onImported }: Props) {
             <div>
               <div className="grid grid-cols-3 gap-3 mb-5">
                 {[
-                  { label: "Sin errores", value: validation.ok,   color: "var(--color-green-700)", bg: "var(--color-mint-50)" },
-                  { label: "Advertencias", value: validation.warn, color: "#8a5a00",                bg: "#fff3d6" },
-                  { label: "Errores",      value: validation.err,  color: "var(--color-danger-fg)", bg: "var(--color-danger-bg)" },
+                  { label: "Sin errores",   value: validation.ok,   color: "var(--color-green-700)", bg: "var(--color-mint-50)" },
+                  { label: "Advertencias",  value: validation.warn, color: "#8a5a00",                bg: "#fff3d6" },
+                  { label: "Errores",       value: validation.err,  color: "var(--color-danger-fg)", bg: "var(--color-danger-bg)" },
                 ].map((s) => (
                   <div key={s.label} className="rounded-[var(--radius-sm)] border border-[var(--color-line)] px-4 py-3">
                     <div className="text-[11px] text-[var(--color-ink-4)] mb-1">{s.label}</div>
@@ -333,15 +346,15 @@ export function ImportWizard({ onClose, onImported }: Props) {
                   <tbody>
                     {validation.rows.map((row) => (
                       <tr key={row.idx} className={cn("border-t border-[var(--color-line)]",
-                        row.sev === "err" ? "bg-[var(--color-danger-bg)]/30"
+                        row.sev === "err"  ? "bg-[var(--color-danger-bg)]/30"
                         : row.sev === "warn" ? "bg-[#fff3d6]/50"
                         : ""
                       )}>
                         <td className="px-3 py-2 font-mono text-[var(--color-ink-4)]">{row.idx + 1}</td>
                         <td className="px-3 py-2">
-                          {row.sev === "ok" && <span className="text-green-600 text-[11px] font-medium">OK</span>}
-                          {row.sev === "warn" && <span className="text-[#8a5a00] text-[11px] font-medium">Aviso</span>}
-                          {row.sev === "err" && <span className="text-[var(--color-danger-fg)] text-[11px] font-medium">{row.issues[0]?.msg}</span>}
+                          {row.sev === "ok"   && <span className="text-green-600 text-[11px] font-medium">OK</span>}
+                          {row.sev === "warn" && <span className="text-[#8a5a00] text-[11px] font-medium">{row.issues[0]?.msg}</span>}
+                          {row.sev === "err"  && <span className="text-[var(--color-danger-fg)] text-[11px] font-medium">{row.issues[0]?.msg}</span>}
                         </td>
                         {TARGETS.filter((t) => mapping[t.id] != null).map((t) => (
                           <td key={t.id} className="px-3 py-2 text-[var(--color-ink-2)] max-w-[140px]">
@@ -353,8 +366,8 @@ export function ImportWizard({ onClose, onImported }: Props) {
                   </tbody>
                 </table>
               </div>
-              {validation.total > 50 && (
-                <p className="text-[12px] text-[var(--color-ink-4)] mt-2">Mostrando las primeras 50 de {validation.total} filas.</p>
+              {validation.total > 100 && (
+                <p className="text-[12px] text-[var(--color-ink-4)] mt-2">Mostrando las primeras 100 de {validation.total} filas.</p>
               )}
             </div>
           )}
@@ -365,14 +378,14 @@ export function ImportWizard({ onClose, onImported }: Props) {
               <div className="size-16 rounded-full bg-[var(--color-mint-50)] grid place-items-center mx-auto">
                 <Check size={28} className="text-green-600" />
               </div>
-              <div className="font-semibold text-[18px] text-[var(--color-ink)]">¡Importación en proceso!</div>
+              <div className="font-semibold text-[18px] text-[var(--color-ink)]">¡Locaciones importadas!</div>
               <div className="text-[13px] text-[var(--color-ink-3)] max-w-sm mx-auto">
-                Se procesarán {validation.total} colaboradores. Las cuentas nuevas recibirán un correo de invitación. Puedes seguir el avance en el log de auditoría.
+                Se crearon {validation.ok + validation.warn} locaciones. Ahora puedes asignar gerente y región desde la vista de locaciones.
               </div>
-              <div className="flex justify-center gap-3 pt-2">
+              <div className="flex justify-center gap-6 pt-2">
                 <div className="text-center">
                   <div className="text-2xl font-bold font-mono text-green-600">{validation.ok}</div>
-                  <div className="text-[12px] text-[var(--color-ink-3)]">A importar</div>
+                  <div className="text-[12px] text-[var(--color-ink-3)]">Importadas</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold font-mono text-[#8a5a00]">{validation.warn}</div>
@@ -380,7 +393,7 @@ export function ImportWizard({ onClose, onImported }: Props) {
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold font-mono text-[var(--color-danger-fg)]">{validation.err}</div>
-                  <div className="text-[12px] text-[var(--color-ink-3)]">Omitidos</div>
+                  <div className="text-[12px] text-[var(--color-ink-3)]">Omitidas</div>
                 </div>
               </div>
             </div>
@@ -399,13 +412,12 @@ export function ImportWizard({ onClose, onImported }: Props) {
             {step === 3 ? "Cerrar" : "Cancelar"}
           </Button>
           {step === 1 && (
-            <Button variant="primary" onClick={() => setStep(2)}>
-              Continuar →
-            </Button>
+            <Button variant="primary" onClick={() => setStep(2)}>Continuar →</Button>
           )}
           {step === 2 && (
-            <Button variant="primary" onClick={doImport} disabled={(validation.err === validation.total && validation.total > 0) || importing}>
-              {importing ? "Importando…" : `Importar ${validation.ok + validation.warn} colaboradores`}
+            <Button variant="primary" onClick={doImport}
+              disabled={(validation.err === validation.total && validation.total > 0) || importing}>
+              {importing ? "Importando…" : `Importar ${validation.ok + validation.warn} locaciones`}
             </Button>
           )}
         </div>

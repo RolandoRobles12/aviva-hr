@@ -1,6 +1,6 @@
 // ── Domain types for Aviva HR ──────────────────────────────────────────────
 
-export interface Hub {
+export interface Region {
   id: string;
   label: string;
   area: string;
@@ -40,7 +40,7 @@ export interface User {
   email: string;
   role: string;
   area?: string;
-  hub: string;
+  region: string;
   quiosco: string;
   estado: string;
   empresa: string;
@@ -113,7 +113,7 @@ export interface Candidate {
   last: string;
   fullName: string;
   position: string;
-  hub: string;
+  region: string;
   quiosco: string;
   estado: string;
   stage: string;

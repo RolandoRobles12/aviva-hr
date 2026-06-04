@@ -1,19 +1,19 @@
 import { useState, useMemo } from "react";
 import { useLocations, type Location } from "@/hooks/useLocations";
-import { createDoc, updateDocById, deleteDocById, useCollection } from "@/hooks/useFirestore";
+import { createDoc, updateDocById, deleteDocById } from "@/hooks/useFirestore";
 import { useUsers } from "@/hooks/useUsers";
 import { LoadingView, ErrorView } from "@/components/ui/Spinner";
 import { Button } from "@/components/ui/Button";
 import { Drawer } from "@/components/ui/Drawer";
-import { Search, Plus, ChevronRight, Close } from "@/components/icons";
+import { Search, Plus, ChevronRight, Close, Upload } from "@/components/icons";
 import { cn } from "@/lib/cn";
 import { useCatalog } from "@/context/CatalogContext";
 import { useNotif } from "@/context/NotifContext";
+import { LocationImportWizard } from "./LocationImportWizard";
 
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  open:   { label: "Abierto",         color: "#026149", bg: "#e7f8ef" },
-  vacant: { label: "Sin cobertura",   color: "#8a5a00", bg: "#fff3d6" },
-  closed: { label: "Cerrado",         color: "#6b716b", bg: "#f1f1ee" },
+  open:   { label: "Activo",   color: "#026149", bg: "#e7f8ef" },
+  closed: { label: "Inactivo", color: "#6b716b", bg: "#f1f1ee" },
 };
 
 const CAT_MAP: Record<string, { label: string; short: string; color: string; bg: string }> = {
@@ -37,9 +37,8 @@ function LocationModal({
   loc: (Location & { id: string }) | "new";
   onClose: () => void;
 }) {
-  const { estados } = useCatalog();
+  const { estados, regions } = useCatalog();
   const { notify } = useNotif();
-  const { data: hubItems } = useCollection<{ label: string }>("catalog/hubs/items");
   const { data: allUsers } = useUsers();
   const isNew = loc === "new";
   const existing = isNew ? null : loc;
@@ -49,7 +48,7 @@ function LocationModal({
   const [estado,        setEstado]        = useState(existing?.estado ?? "");
   const [direccion,     setDireccion]     = useState(existing?.direccion ?? "");
   const [gerente,       setGerente]       = useState(existing?.gerente ?? "");
-  const [hub,           setHub]           = useState(existing?.hub ?? "");
+  const [region,        setRegion]        = useState(existing?.region ?? "");
   const [fechaApertura, setFechaApertura] = useState(existing?.fechaApertura ?? "");
   const [status,        setStatus]        = useState<"open" | "vacant" | "closed">(existing?.status ?? "open");
   const [producto,      setProducto]      = useState(existing?.producto ?? "");
@@ -62,7 +61,7 @@ function LocationModal({
     try {
       const catFields = getCatFields(producto);
       const allFields = {
-        code, ciudad, estado, direccion, gerente, hub,
+        code, ciudad, estado, direccion, gerente, region,
         fechaApertura, status, producto, ubicacion,
         categoria: producto,
         catLabel: catFields.label,
@@ -139,20 +138,19 @@ function LocationModal({
               </select>
             </div>
             <div>
-              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Hub</label>
-              <select className={inputClass} value={hub} onChange={(e) => setHub(e.target.value)}>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Región</label>
+              <select className={inputClass} value={region} onChange={(e) => setRegion(e.target.value)}>
                 <option value="">Sin asignar</option>
-                {hubItems.map((h) => (
-                  <option key={h.id} value={h.label}>{h.label}</option>
+                {regions.map((r) => (
+                  <option key={r.id} value={r.id}>{r.label}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Estatus</label>
-              <select className={inputClass} value={status} onChange={(e) => setStatus(e.target.value as "open" | "vacant" | "closed")}>
-                <option value="open">Abierto</option>
-                <option value="vacant">Sin cobertura</option>
-                <option value="closed">Cerrado</option>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Estatus del punto de venta</label>
+              <select className={inputClass} value={status} onChange={(e) => setStatus(e.target.value as "open" | "closed")}>
+                <option value="open">Activo</option>
+                <option value="closed">Inactivo</option>
               </select>
             </div>
             <div>
@@ -208,11 +206,18 @@ function LocationDetail({
             style={{ background: loc.catBg, color: loc.catColor, border: `1px solid ${loc.catColor}22` }}>
             {loc.catShort}
           </div>
-          <div>
+          <div className="flex flex-col gap-1">
             <div className="text-[14px] font-semibold text-[var(--color-ink)]">{loc.catLabel}</div>
-            <span className="text-[12px] font-medium px-2 py-0.5 rounded-full" style={{ color: statusCfg.color, background: statusCfg.bg }}>
-              {statusCfg.label}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[12px] font-medium px-2 py-0.5 rounded-full" style={{ color: statusCfg.color, background: statusCfg.bg }}>
+                {statusCfg.label}
+              </span>
+              {!loc.gerente && (
+                <span className="text-[12px] font-medium px-2 py-0.5 rounded-full" style={{ color: "#8a5a00", background: "#fff3d6" }}>
+                  Sin cobertura
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -222,8 +227,8 @@ function LocationDetail({
             ["Código", loc.code],
             ["Ciudad", loc.ciudad],
             ["Estado", loc.estado],
-            ["Gerente", loc.gerente],
-            ["Hub", loc.hub],
+            ["Gerente", loc.gerente || "Sin asignar"],
+            ["Región", loc.region],
             ["Apertura", loc.fechaApertura],
             ["Dirección", loc.direccion],
             ["Producto", loc.producto ?? "—"],
@@ -268,8 +273,9 @@ export function LocationsView() {
   const [estadoF,   setEstadoF]   = useState("all");
   const [statusF,   setStatusF]   = useState("all");
   const [productoF, setProductoF] = useState("all");
-  const [selected, setSelected] = useState<(Location & { id: string }) | null>(null);
-  const [locModal, setLocModal] = useState<(Location & { id: string }) | "new" | null>(null);
+  const [selected,   setSelected]   = useState<(Location & { id: string }) | null>(null);
+  const [locModal,   setLocModal]   = useState<(Location & { id: string }) | "new" | null>(null);
+  const [importing,  setImporting]  = useState(false);
 
   const filtered = useMemo(() => {
     const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -315,9 +321,8 @@ export function LocationsView() {
         <select value={statusF} onChange={(e) => setStatusF(e.target.value)}
           className="h-8 px-2 text-[12.5px] rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-2)] outline-none">
           <option value="all">Todos los estatus</option>
-          <option value="open">Abierto</option>
-          <option value="vacant">Sin cobertura</option>
-          <option value="closed">Cerrado</option>
+          <option value="open">Activo</option>
+          <option value="closed">Inactivo</option>
         </select>
         <select value={productoF} onChange={(e) => setProductoF(e.target.value)}
           className="h-8 px-2 text-[12.5px] rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-2)] outline-none">
@@ -326,6 +331,7 @@ export function LocationsView() {
         </select>
         <div className="ml-auto flex items-center gap-2">
           <span className="text-[12px] text-[var(--color-ink-4)]">{filtered.length} locaciones</span>
+          <Button variant="secondary" size="sm" icon={<Upload size={13} />} onClick={() => setImporting(true)}>Importar</Button>
           <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={() => setLocModal("new")}>Nueva locación</Button>
         </div>
       </div>
@@ -358,7 +364,7 @@ export function LocationsView() {
                   </td>
                   <td className="px-4 py-3 text-[var(--color-ink-2)]">{l.ciudad}</td>
                   <td className="px-4 py-3 text-[var(--color-ink-3)]">{l.estado}</td>
-                  <td className="px-4 py-3 text-[var(--color-ink-3)]">{l.gerente}</td>
+                  <td className="px-4 py-3 text-[var(--color-ink-3)]">{l.gerente || <span className="text-[11px] font-medium px-1.5 py-0.5 rounded-full" style={{ color: "#8a5a00", background: "#fff3d6" }}>Sin cobertura</span>}</td>
                   <td className="px-4 py-3 font-mono text-[12px] text-[var(--color-ink-4)]">{l.fechaApertura}</td>
                   <td className="px-4 py-3">
                     <span className="text-[12px] font-medium px-2 py-0.5 rounded-full" style={{ color: statusCfg.color, background: statusCfg.bg }}>
@@ -387,6 +393,9 @@ export function LocationsView() {
       )}
       {locModal && (
         <LocationModal loc={locModal} onClose={() => setLocModal(null)} />
+      )}
+      {importing && (
+        <LocationImportWizard onClose={() => setImporting(false)} />
       )}
     </div>
   );

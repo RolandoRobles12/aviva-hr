@@ -1,5 +1,5 @@
 import type {
-  Hub,
+  Region,
   Integration,
   User,
   Stage,
@@ -19,7 +19,7 @@ export const estados = [
   "Quintana Roo", "Tabasco", "Coahuila", "Guerrero",
 ];
 
-export const hubs: Hub[] = [
+export const regions: Region[] = [
   { id: "corporativo",             label: "Corporativo",                          area: "Growth",             leader: "Andrés Rizo" },
   { id: "equipo_ventas_aviva",     label: "Equipo de ventas Aviva",               area: "Kiosk Acquisitions", leader: "Andrés Arías" },
   { id: "hub1-region_hidalgo",     label: "Hub 1 · Hidalgo",                      area: "Kiosk Acquisitions", leader: "Lyz Nuñez" },

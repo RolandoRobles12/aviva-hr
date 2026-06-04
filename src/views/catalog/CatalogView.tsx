@@ -8,7 +8,7 @@ import { cn } from "@/lib/cn";
 
 interface Product  { id?: string; name: string; tagline: string; color: string; bg: string }
 interface Position { id?: string; name: string; level: string; area: string; productId: string | null }
-interface Hub      { id?: string; label: string; area: string; leader: string }
+interface Region   { id?: string; label: string; area: string; leader: string }
 
 const AREAS = ["Kiosk Acquisitions", "Growth", "Sales", "Operaciones", "People & Culture", "Legal", "Finanzas", "Tecnología", "Agencia"];
 const LEVELS = ["operativo", "junior", "senior", "manager", "director", "vp", "clevel"];
@@ -152,32 +152,32 @@ function PositionModal({ pos, onClose }: { pos: (Position & { id: string }) | "n
   );
 }
 
-// ── Hub Modal ──────────────────────────────────────────────────────────────────
-function HubModal({ hub, onClose }: { hub: (Hub & { id: string }) | "new"; onClose: () => void }) {
-  const isNew = hub === "new";
-  const existing = isNew ? null : hub;
+// ── Region Modal ───────────────────────────────────────────────────────────────
+function RegionModal({ region, onClose }: { region: (Region & { id: string }) | "new"; onClose: () => void }) {
+  const isNew = region === "new";
+  const existing = isNew ? null : region;
   const { data: users } = useUsers();
-  const [label,   setLabel]   = useState(existing?.label  ?? "");
-  const [area,    setArea]    = useState(existing?.area   ?? "");
-  const [leader,  setLeader]  = useState(existing?.leader ?? "");
-  const [saving,  setSaving]  = useState(false);
+  const [label,  setLabel]  = useState(existing?.label  ?? "");
+  const [area,   setArea]   = useState(existing?.area   ?? "");
+  const [leader, setLeader] = useState(existing?.leader ?? "");
+  const [saving, setSaving] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     try {
-      if (isNew) await createDoc("catalog/hubs/items", { label, area, leader });
-      else        await updateDocById("catalog/hubs/items", existing!.id, { label, area, leader });
+      if (isNew) await createDoc("catalog/regions/items", { label, area, leader });
+      else        await updateDocById("catalog/regions/items", existing!.id, { label, area, leader });
       onClose();
     } finally { setSaving(false); }
   }
 
   return (
-    <ModalShell title={isNew ? "Nuevo hub" : "Editar hub"} onClose={onClose}>
+    <ModalShell title={isNew ? "Nueva región" : "Editar región"} onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-3">
         <div>
-          <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Nombre del hub *</label>
-          <input className={inputClass} required value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Ej. Hub 1 · Hidalgo" />
+          <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Nombre de la región *</label>
+          <input className={inputClass} required value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Ej. Región 1 · Hidalgo" />
         </div>
         <div>
           <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Área *</label>
@@ -187,7 +187,7 @@ function HubModal({ hub, onClose }: { hub: (Hub & { id: string }) | "new"; onClo
           </select>
         </div>
         <div>
-          <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Líder de hub</label>
+          <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Líder de región</label>
           <select className={inputClass} value={leader} onChange={(e) => setLeader(e.target.value)}>
             <option value="">Sin asignar</option>
             {users.map((u) => <option key={u.id} value={u.fullName}>{u.fullName}</option>)}
@@ -203,34 +203,34 @@ function HubModal({ hub, onClose }: { hub: (Hub & { id: string }) | "new"; onClo
 }
 
 // ── Main view ──────────────────────────────────────────────────────────────────
-type CatalogTab = "products" | "positions" | "hubs";
+type CatalogTab = "products" | "positions" | "regions";
 
 export function CatalogView() {
-  const { data: products,  loading: lp,   error: ep }   = useCollection<Product>("catalog/products/items");
-  const { data: positions, loading: lpos               } = useCollection<Position>("catalog/positions/items");
-  const { data: hubs,      loading: lhubs              } = useCollection<Hub>("catalog/hubs/items");
-  const [tab,      setTab]      = useState<CatalogTab>("positions");
-  const [prodModal, setProdModal] = useState<(Product  & { id: string }) | "new" | null>(null);
-  const [posModal,  setPosModal]  = useState<(Position & { id: string }) | "new" | null>(null);
-  const [hubModal,  setHubModal]  = useState<(Hub      & { id: string }) | "new" | null>(null);
+  const { data: products,  loading: lp,   error: ep } = useCollection<Product>("catalog/products/items");
+  const { data: positions, loading: lpos             } = useCollection<Position>("catalog/positions/items");
+  const { data: regions,   loading: lr               } = useCollection<Region>("catalog/regions/items");
+  const [tab,         setTab]         = useState<CatalogTab>("positions");
+  const [prodModal,   setProdModal]   = useState<(Product  & { id: string }) | "new" | null>(null);
+  const [posModal,    setPosModal]    = useState<(Position & { id: string }) | "new" | null>(null);
+  const [regionModal, setRegionModal] = useState<(Region   & { id: string }) | "new" | null>(null);
 
   async function deleteProduct(id: string)  { if (confirm("¿Eliminar este producto?"))  await deleteDocById("catalog/products/items",  id); }
   async function deletePosition(id: string) { if (confirm("¿Eliminar este puesto?"))    await deleteDocById("catalog/positions/items", id); }
-  async function deleteHub(id: string)      { if (confirm("¿Eliminar este hub?"))       await deleteDocById("catalog/hubs/items",      id); }
+  async function deleteRegion(id: string)   { if (confirm("¿Eliminar esta región?"))    await deleteDocById("catalog/regions/items",   id); }
 
-  if (lp || lpos || lhubs) return <LoadingView />;
-  if (ep)                   return <ErrorView message={ep.message} />;
+  if (lp || lpos || lr) return <LoadingView />;
+  if (ep)               return <ErrorView message={ep.message} />;
 
   const TAB_CONFIG: Record<CatalogTab, { label: string; count: number; action: string }> = {
-    products:  { label: "Productos",  count: products.length,  action: "Nuevo producto" },
-    positions: { label: "Puestos",    count: positions.length, action: "Nuevo puesto"   },
-    hubs:      { label: "Hubs",       count: hubs.length,      action: "Nuevo hub"      },
+    products:  { label: "Productos", count: products.length,  action: "Nuevo producto" },
+    positions: { label: "Puestos",   count: positions.length, action: "Nuevo puesto"   },
+    regions:   { label: "Regiones",  count: regions.length,   action: "Nueva región"   },
   };
 
   function handleNew() {
     if (tab === "products")  setProdModal("new");
     if (tab === "positions") setPosModal("new");
-    if (tab === "hubs")      setHubModal("new");
+    if (tab === "regions")   setRegionModal("new");
   }
 
   return (
@@ -238,7 +238,7 @@ export function CatalogView() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="font-serif text-[22px] font-medium text-[var(--color-ink)]">Catálogo</h1>
-          <p className="text-[12.5px] text-[var(--color-ink-3)]">Hubs, puestos y productos usados en directorio y locaciones.</p>
+          <p className="text-[12.5px] text-[var(--color-ink-3)]">Regiones, puestos y productos usados en directorio y locaciones.</p>
         </div>
         <Button variant="primary" icon={<Plus size={14} />} onClick={handleNew}>{TAB_CONFIG[tab].action}</Button>
       </div>
@@ -306,40 +306,40 @@ export function CatalogView() {
         </div>
       )}
 
-      {/* Hubs */}
-      {tab === "hubs" && (
+      {/* Regions */}
+      {tab === "regions" && (
         <div className="rounded-[var(--radius)] bg-[var(--color-surface)] border border-[var(--color-line)] shadow-[var(--shadow-sm)] overflow-hidden">
           <table className="w-full border-collapse text-[13px]">
             <thead>
               <tr className="border-b border-[var(--color-line)] bg-[var(--color-surface-2)]">
-                {["Hub", "Área", "Líder", ""].map((h) => (
+                {["Región", "Área", "Líder", ""].map((h) => (
                   <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-4)]">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {hubs.map((h) => (
-                <tr key={h.id} className="border-b border-[var(--color-line)] last:border-0 hover:bg-[var(--color-surface-2)]">
-                  <td className="px-4 py-3 font-medium text-[var(--color-ink)]">{h.label}</td>
-                  <td className="px-4 py-3 text-[var(--color-ink-3)]">{h.area}</td>
-                  <td className="px-4 py-3 text-[var(--color-ink-3)]">{h.leader || "—"}</td>
+              {regions.map((r) => (
+                <tr key={r.id} className="border-b border-[var(--color-line)] last:border-0 hover:bg-[var(--color-surface-2)]">
+                  <td className="px-4 py-3 font-medium text-[var(--color-ink)]">{r.label}</td>
+                  <td className="px-4 py-3 text-[var(--color-ink-3)]">{r.area}</td>
+                  <td className="px-4 py-3 text-[var(--color-ink-3)]">{r.leader || "—"}</td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1 justify-end">
-                      <Button size="sm" variant="ghost" icon={<Edit size={13} />} onClick={() => setHubModal(h)} />
-                      <Button size="sm" variant="ghost" icon={<Trash2 size={13} />} onClick={() => deleteHub(h.id!)} />
+                      <Button size="sm" variant="ghost" icon={<Edit size={13} />} onClick={() => setRegionModal(r)} />
+                      <Button size="sm" variant="ghost" icon={<Trash2 size={13} />} onClick={() => deleteRegion(r.id!)} />
                     </div>
                   </td>
                 </tr>
               ))}
-              {hubs.length === 0 && <tr><td colSpan={4} className="px-4 py-12 text-center text-[13px] text-[var(--color-ink-4)]">Sin hubs configurados.</td></tr>}
+              {regions.length === 0 && <tr><td colSpan={4} className="px-4 py-12 text-center text-[13px] text-[var(--color-ink-4)]">Sin regiones configuradas.</td></tr>}
             </tbody>
           </table>
         </div>
       )}
 
-      {prodModal && <ProductModal prod={prodModal} onClose={() => setProdModal(null)} />}
-      {posModal  && <PositionModal pos={posModal}  onClose={() => setPosModal(null)} />}
-      {hubModal  && <HubModal hub={hubModal}        onClose={() => setHubModal(null)} />}
+      {prodModal   && <ProductModal  prod={prodModal}     onClose={() => setProdModal(null)} />}
+      {posModal    && <PositionModal pos={posModal}       onClose={() => setPosModal(null)} />}
+      {regionModal && <RegionModal   region={regionModal} onClose={() => setRegionModal(null)} />}
     </div>
   );
 }

@@ -27,7 +27,7 @@ const TALLAS = ["CH", "M", "G", "XG", "XXG"];
 
 // ── New User Modal ─────────────────────────────────────────────────────────────
 function NewUserModal({ onClose }: { onClose: () => void }) {
-  const { hubs, estados } = useCatalog();
+  const { regions, estados } = useCatalog();
   const { notify } = useNotif();
   const { data: positions } = useCollection<{ name: string }>("catalog/positions/items");
   const { data: quioscos } = useCollection<{ name: string }>("catalog/quioscos/items");
@@ -40,7 +40,7 @@ function NewUserModal({ onClose }: { onClose: () => void }) {
   const [email, setEmail]       = useState("");
   const [role,  setRole]        = useState("");
   const [area,  setArea]        = useState("");
-  const [hub,   setHub]         = useState("");
+  const [region,   setRegion]   = useState("");
   const [quiosco, setQuiosco]   = useState("");
   const [estado,  setEstado]    = useState("");
   const [empresa, setEmpresa]   = useState("Aviva Crédito");
@@ -58,7 +58,7 @@ function NewUserModal({ onClose }: { onClose: () => void }) {
       await createUser({
         numColaborador, first, last,
         fullName: `${first} ${last}`,
-        email, role, area, hub, quiosco, estado, empresa,
+        email, role, area, region, quiosco, estado, empresa,
         genero, talla, phone,
         dealOwner,
         manager: managerId || null,
@@ -132,10 +132,10 @@ function NewUserModal({ onClose }: { onClose: () => void }) {
               </select>
             </div>
             <div>
-              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Hub o equipo</label>
-              <select className={inputClass} value={hub} onChange={(e) => setHub(e.target.value)}>
+              <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Región</label>
+              <select className={inputClass} value={region} onChange={(e) => setRegion(e.target.value)}>
                 <option value="">Sin asignar</option>
-                {hubs.map((h) => <option key={h.id} value={h.id}>{h.label}</option>)}
+                {regions.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
               </select>
             </div>
             <div>
@@ -226,7 +226,7 @@ function KPIs({ users }: { users: (User & { id: string })[] }) {
 
 // ── User drawer ───────────────────────────────────────────────────────────────
 function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; allUsers: (User & { id: string })[]; onClose: () => void }) {
-  const { hubLabel } = useCatalog();
+  const { regionLabel } = useCatalog();
   const { data: integrations } = useIntegrations();
   const [tab, setTab] = useState<"info" | "access" | "devices">("info");
   const manager = allUsers.find((u) => u.id === user.manager);
@@ -264,7 +264,7 @@ function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; 
                   ["Email",        user.email],
                   ["Teléfono",     user.phone],
                   ["Área",         user.area ?? "—"],
-                  ["Hub o equipo", hubLabel(user.hub)],
+                  ["Región", regionLabel(user.region)],
                   ["Empresa",      user.empresa],
                   ["Jefe inmediato", manager?.fullName ?? user.managerName ?? "—"],
                   ["Ingreso",      user.hiredAt],
@@ -352,12 +352,12 @@ function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; 
 }
 
 // ── Grid card ─────────────────────────────────────────────────────────────────
-function UserCard({ user, selected, onToggle, onClick, hubLabel }: {
+function UserCard({ user, selected, onToggle, onClick, regionLabel }: {
   user: User & { id: string };
   selected: boolean;
   onToggle: (e: React.MouseEvent) => void;
   onClick: () => void;
-  hubLabel: (id: string) => string;
+  regionLabel: (id: string) => string;
 }) {
   return (
     <div
@@ -384,7 +384,7 @@ function UserCard({ user, selected, onToggle, onClick, hubLabel }: {
       <div className="flex flex-wrap gap-1">
         <StatusBadge status={user.status} />
         <span className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--color-surface-2)] border border-[var(--color-line)] text-[var(--color-ink-3)]">
-          {hubLabel(user.hub)}
+          {regionLabel(user.region)}
         </span>
         <span className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--color-surface-2)] border border-[var(--color-line)] text-[var(--color-ink-3)]">
           {user.quiosco}
@@ -410,13 +410,13 @@ function BulkBar({ count, onClear, onOffboard }: { count: number; onClear: () =>
 
 // ── Main view ─────────────────────────────────────────────────────────────────
 export function DirectoryView() {
-  const { hubs, hubLabel, estados } = useCatalog();
+  const { regions, regionLabel, estados } = useCatalog();
   const { data: users, loading, error } = useUsers();
   const { notify } = useNotif();
   const navigate = useNavigate();
   const [tab,      setTab]      = useState<StatusTab>("all");
   const [query,    setQuery]    = useState("");
-  const [hubF,     setHubF]     = useState("all");
+  const [regionF,  setRegionF]  = useState("all");
   const [estadoF,  setEstadoF]  = useState("all");
   const [sortBy,   setSortBy]   = useState("name");
   const [layout,   setLayout]   = useState<"table" | "grid">("table");
@@ -426,10 +426,10 @@ export function DirectoryView() {
   const [newUserOpen, setNewUserOpen] = useState(false);
 
   function exportCSV() {
-    const headers = ["Número","Nombre completo","Email","Puesto","Hub","Quiósco","Estado","Empresa","Estatus","Antigüedad (meses)"];
+    const headers = ["Número","Nombre completo","Email","Puesto","Región","Quiósco","Estado","Empresa","Estatus","Antigüedad (meses)"];
     const rows = filtered.map(u => [
       u.numColaborador, u.fullName, u.email, u.role,
-      hubLabel(u.hub), u.quiosco, u.estado, u.empresa, u.status, u.hireMonths,
+      regionLabel(u.region), u.quiosco, u.estado, u.empresa, u.status, u.hireMonths,
     ]);
     const csv = [headers, ...rows].map(r => r.map(c => `"${String(c??'').replace(/"/g,'""')}"`).join(",")).join("\n");
     const a = document.createElement("a");
@@ -448,7 +448,7 @@ export function DirectoryView() {
   const filtered = useMemo(() => {
     let arr = users.filter((u) => {
       if (tab !== "all" && u.status !== tab) return false;
-      if (hubF !== "all" && u.hub !== hubF) return false;
+      if (regionF !== "all" && u.region !== regionF) return false;
       if (estadoF !== "all" && u.estado !== estadoF) return false;
       if (query.trim()) {
         const q = norm(query);
@@ -463,11 +463,11 @@ export function DirectoryView() {
       return true;
     });
     if (sortBy === "name")    arr = [...arr].sort((a, b) => a.fullName.localeCompare(b.fullName));
-    if (sortBy === "hub")     arr = [...arr].sort((a, b) => (a.hub || "").localeCompare(b.hub || ""));
+    if (sortBy === "region")  arr = [...arr].sort((a, b) => (a.region || "").localeCompare(b.region || ""));
     if (sortBy === "quiosco") arr = [...arr].sort((a, b) => (a.quiosco || "").localeCompare(b.quiosco || ""));
     if (sortBy === "recent")  arr = [...arr].sort((a, b) => a.hireMonths - b.hireMonths);
     return arr;
-  }, [users, tab, query, hubF, estadoF, sortBy]);
+  }, [users, tab, query, regionF, estadoF, sortBy]);
 
   const counts = useMemo(() => {
     const m: Record<string, number> = { all: users.length };
@@ -539,10 +539,10 @@ export function DirectoryView() {
             <input type="search" placeholder="Nombre, correo, quiósco…" value={query} onChange={(e) => setQuery(e.target.value)}
               className="flex-1 bg-transparent text-[13px] text-[var(--color-ink)] placeholder:text-[var(--color-ink-4)] outline-none" />
           </div>
-          <select value={hubF} onChange={(e) => setHubF(e.target.value)}
+          <select value={regionF} onChange={(e) => setRegionF(e.target.value)}
             className="h-8 px-2 text-[12.5px] rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-2)] outline-none">
-            <option value="all">Todos los hubs</option>
-            {hubs.map((h) => <option key={h.id} value={h.id}>{h.label}</option>)}
+            <option value="all">Todas las regiones</option>
+            {regions.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
           </select>
           <select value={estadoF} onChange={(e) => setEstadoF(e.target.value)}
             className="h-8 px-2 text-[12.5px] rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-2)] outline-none">
@@ -554,7 +554,7 @@ export function DirectoryView() {
             <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}
               className="h-8 px-2 text-[12.5px] rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-2)] outline-none">
               <option value="name">Nombre A–Z</option>
-              <option value="hub">Hub</option>
+              <option value="region">Región</option>
               <option value="quiosco">Quiósco</option>
               <option value="recent">Más recientes</option>
             </select>
@@ -575,7 +575,7 @@ export function DirectoryView() {
                     onChange={toggleAll}
                     className="cursor-pointer" />
                 </th>
-                {["Persona", "Puesto", "Hub", "Quiósco", "Estado", "Manager", "Estatus", "Antigüedad", ""].map((h) => (
+                {["Persona", "Puesto", "Región", "Quiósco", "Estado", "Manager", "Estatus", "Antigüedad", ""].map((h) => (
                   <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-4)] whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -605,7 +605,7 @@ export function DirectoryView() {
                       <span className="truncate block text-[12.5px]">{u.role}</span>
                     </td>
                     <td className="px-4 py-3 max-w-[140px]">
-                      <span className="truncate block text-[12px] text-[var(--color-ink-3)]">{hubLabel(u.hub)}</span>
+                      <span className="truncate block text-[12px] text-[var(--color-ink-3)]">{regionLabel(u.region)}</span>
                     </td>
                     <td className="px-4 py-3 text-[var(--color-ink-3)] whitespace-nowrap text-[12.5px]">{u.quiosco}</td>
                     <td className="px-4 py-3 text-[12px] text-[var(--color-ink-3)]">{u.estado}</td>
@@ -639,7 +639,7 @@ export function DirectoryView() {
                 selected={selected.has(u.id)}
                 onToggle={(e) => toggleRow(u.id, e)}
                 onClick={() => setDrawer(u)}
-                hubLabel={hubLabel}
+                regionLabel={regionLabel}
               />
             ))}
             {filtered.length === 0 && (

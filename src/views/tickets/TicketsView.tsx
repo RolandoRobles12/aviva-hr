@@ -35,7 +35,7 @@ const KIND_LABELS: Record<TicketFormKind, string> = {
 const REASONS_BY_KIND: Record<TicketFormKind, string[]> = {
   offboarding: ["Renuncia voluntaria", "Fin de contrato", "Despido", "Mutuo acuerdo", "Otro"],
   suspend:     ["Investigación interna", "Permiso sin goce", "Incapacidad médica", "Otro"],
-  transfer:    ["Cambio de hub", "Ascenso", "Reubicación geográfica", "Otro"],
+  transfer:    ["Cambio de región", "Ascenso", "Reubicación geográfica", "Otro"],
   access:      ["Proyecto especial", "Cobertura temporal", "Solicitud de manager", "Otro"],
 };
 
