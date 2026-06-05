@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Drawer } from "@/components/ui/Drawer";
 import { Search, Plus, ChevronRight, Close, Upload } from "@/components/icons";
 import { cn } from "@/lib/cn";
+import { monthsSince } from "@/lib/dates";
 import { useCatalog } from "@/context/CatalogContext";
 import { useNotif } from "@/context/NotifContext";
 import { LocationImportWizard } from "./LocationImportWizard";
@@ -230,6 +231,7 @@ function LocationDetail({
             ["Gerente", loc.gerente || "Sin asignar"],
             ["Región", loc.region],
             ["Apertura", loc.fechaApertura],
+            ["Antigüedad", loc.fechaApertura ? `${monthsSince(loc.fechaApertura)} meses` : "—"],
             ["Dirección", loc.direccion],
             ["Producto", loc.producto ?? "—"],
           ].map(([label, value]) => (
@@ -365,7 +367,7 @@ export function LocationsView() {
                   <td className="px-4 py-3 text-[var(--color-ink-2)]">{l.ciudad}</td>
                   <td className="px-4 py-3 text-[var(--color-ink-3)]">{l.estado}</td>
                   <td className="px-4 py-3 text-[var(--color-ink-3)]">{l.gerente || <span className="text-[11px] font-medium px-1.5 py-0.5 rounded-full" style={{ color: "#8a5a00", background: "#fff3d6" }}>Sin cobertura</span>}</td>
-                  <td className="px-4 py-3 font-mono text-[12px] text-[var(--color-ink-4)]">{l.fechaApertura}</td>
+                  <td className="px-4 py-3 font-mono text-[12px] text-[var(--color-ink-4)]">{monthsSince(l.fechaApertura)}m</td>
                   <td className="px-4 py-3">
                     <span className="text-[12px] font-medium px-2 py-0.5 rounded-full" style={{ color: statusCfg.color, background: statusCfg.bg }}>
                       {statusCfg.label}
