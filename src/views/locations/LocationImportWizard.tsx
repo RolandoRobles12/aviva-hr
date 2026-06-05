@@ -4,6 +4,23 @@ import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { createDoc } from "@/hooks/useFirestore";
 
+const ESTADOS_MX = [
+  "Aguascalientes", "Baja California", "Baja California Sur", "Campeche",
+  "Chiapas", "Chihuahua", "Ciudad de México", "CDMX", "Coahuila", "Colima",
+  "Durango", "Guanajuato", "Guerrero", "Hidalgo", "Jalisco", "México",
+  "Michoacán", "Morelos", "Nayarit", "Nuevo León", "Oaxaca", "Puebla",
+  "Querétaro", "Quintana Roo", "San Luis Potosí", "Sinaloa", "Sonora",
+  "Tabasco", "Tamaulipas", "Tlaxcala", "Veracruz", "Yucatán", "Zacatecas",
+];
+
+const norm = (s: string) =>
+  s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+
+function normalizeEstado(raw: string): string {
+  const n = norm(raw);
+  return ESTADOS_MX.find((e) => norm(e) === n) ?? raw;
+}
+
 // ── CAT_MAP (must match LocationsView) ────────────────────────────────────────
 const CAT_MAP: Record<string, { label: string; short: string; color: string; bg: string }> = {
   "Aviva tu Compra":      { label: "Aviva tu Compra",      short: "AtC", color: "#1b3f8a", bg: "#e3eeff" },
@@ -131,6 +148,9 @@ export function LocationImportWizard({ onClose, onImported }: Props) {
       requiredIds.forEach((rid) => {
         if (!mapped[rid as TargetId]) issues.push({ kind: "err", msg: `Falta ${rid}` });
       });
+      if (mapped.estado && !ESTADOS_MX.some((e) => norm(e) === norm(mapped.estado!))) {
+        issues.push({ kind: "warn", msg: `Estado "${mapped.estado}" no reconocido — se guardará tal cual` });
+      }
       if (!mapped.producto && !mapped.categoria) {
         issues.push({ kind: "warn", msg: "Sin producto/categoría — se usará Quiósco" });
       }
@@ -156,7 +176,7 @@ export function LocationImportWizard({ onClose, onImported }: Props) {
           return createDoc("locations", {
             code:          row.mapped.code          ?? "",
             ciudad:        row.mapped.ciudad        ?? "",
-            estado:        row.mapped.estado        ?? "",
+            estado:        normalizeEstado(row.mapped.estado ?? ""),
             ubicacion:     row.mapped.ubicacion     ?? "",
             direccion:     row.mapped.direccion     ?? "",
             producto,

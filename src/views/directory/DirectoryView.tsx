@@ -18,6 +18,7 @@ import {
   TableIcon, GridIcon, ArrowUpDown, Close,
 } from "@/components/icons";
 import { cn } from "@/lib/cn";
+import { monthsSince } from "@/lib/dates";
 
 const AREAS = [
   "Kiosk Acquisitions", "Growth", "Sales", "Operaciones",
@@ -321,7 +322,7 @@ function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; 
                   ["Empresa",        user.empresa],
                   ["Jefe inmediato", manager?.fullName ?? user.managerName ?? "—"],
                   ["Ingreso",        user.hiredAt],
-                  ["Antigüedad",     `${user.hireMonths} meses`],
+                  ["Antigüedad",     `${monthsSince(user.hiredAt)} meses`],
                   ["Talla",          user.talla],
                   ["Deal Owner",     user.hubspot ? "Sí" : "No"],
                 ].map(([label, value]) => (
@@ -563,7 +564,7 @@ export function DirectoryView() {
     const headers = ["Número","Nombre completo","Email","Puesto","Región","Quiósco","Estado","Empresa","Estatus","Antigüedad (meses)"];
     const rows = filtered.map(u => [
       u.numColaborador, u.fullName, u.email, u.role,
-      regionLabel(u.region), u.quiosco, u.estado, u.empresa, u.status, u.hireMonths,
+      regionLabel(u.region), u.quiosco, u.estado, u.empresa, u.status, monthsSince(u.hiredAt),
     ]);
     const csv = [headers, ...rows].map(r => r.map(c => `"${String(c??'').replace(/"/g,'""')}"`).join(",")).join("\n");
     const a = document.createElement("a");
@@ -599,7 +600,7 @@ export function DirectoryView() {
     if (sortBy === "name")    arr = [...arr].sort((a, b) => a.fullName.localeCompare(b.fullName));
     if (sortBy === "region")  arr = [...arr].sort((a, b) => (a.region || "").localeCompare(b.region || ""));
     if (sortBy === "quiosco") arr = [...arr].sort((a, b) => (a.quiosco || "").localeCompare(b.quiosco || ""));
-    if (sortBy === "recent")  arr = [...arr].sort((a, b) => a.hireMonths - b.hireMonths);
+    if (sortBy === "recent")  arr = [...arr].sort((a, b) => (b.hiredAt ?? "").localeCompare(a.hiredAt ?? ""));
     return arr;
   }, [users, tab, query, regionF, estadoF, sortBy]);
 
@@ -747,7 +748,7 @@ export function DirectoryView() {
                       {mgr ? <span className="flex items-center gap-1.5"><Avatar user={mgr} size="sm" />{mgr.first}</span> : "—"}
                     </td>
                     <td className="px-4 py-3"><StatusBadge status={u.status} /></td>
-                    <td className="px-4 py-3 font-mono text-[12px] text-[var(--color-ink-4)]">{u.hireMonths}m</td>
+                    <td className="px-4 py-3 font-mono text-[12px] text-[var(--color-ink-4)]">{monthsSince(u.hiredAt)}m</td>
                     <td className="px-4 py-3">
                       <ChevronRight size={14} className="text-[var(--color-ink-4)] opacity-0 group-hover:opacity-100 transition-opacity" />
                     </td>
