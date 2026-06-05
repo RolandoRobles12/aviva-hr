@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { createDoc, updateDocById } from "@/hooks/useFirestore";
 import { useLocations } from "@/hooks/useLocations";
+import { writeAuditEntry } from "@/services/audit";
 
 const ESTADOS_MX = [
   "Aguascalientes", "Baja California", "Baja California Sur", "Campeche",
@@ -200,6 +201,11 @@ export function LocationImportWizard({ onClose, onImported }: Props) {
             : createDoc("locations", payload);
         })
       );
+      await writeAuditEntry({
+        action: "importó locaciones",
+        target: `${validation.total} filas (${validation.ok} OK · ${validation.warn} avisos · ${validation.err} incompletos)`,
+        source: "manual",
+      });
       onImported?.({ ok: validation.ok, warn: validation.warn, err: validation.err, total: validation.total });
       setStep(3);
     } finally {

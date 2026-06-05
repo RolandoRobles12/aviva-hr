@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { createDoc, updateDocById } from "@/hooks/useFirestore";
 import { useUsers } from "@/hooks/useUsers";
+import { writeAuditEntry } from "@/services/audit";
 
 const MESES: Record<string, string> = {
   enero:"01", febrero:"02", marzo:"03", abril:"04", mayo:"05", junio:"06",
@@ -190,6 +191,11 @@ export function ImportWizard({ onClose, onImported }: Props) {
             : createDoc("users", payload);
         })
       );
+      await writeAuditEntry({
+        action: "importó colaboradores",
+        target: `${validation.total} filas (${validation.ok} OK · ${validation.warn} avisos · ${validation.err} incompletos)`,
+        source: "manual",
+      });
       onImported?.({ ok: validation.ok, warn: validation.warn, err: validation.err, total: validation.total });
       setStep(3);
     } finally {
