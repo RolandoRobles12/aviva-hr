@@ -4,6 +4,26 @@ import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { createDoc } from "@/hooks/useFirestore";
 
+const MESES: Record<string, string> = {
+  enero:"01", febrero:"02", marzo:"03", abril:"04", mayo:"05", junio:"06",
+  julio:"07", agosto:"08", septiembre:"09", octubre:"10", noviembre:"11", diciembre:"12",
+};
+
+function parseDate(raw: string): string {
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw.trim())) return raw.trim();
+  // "4 de octubre de 2022" / "4 octubre 2022"
+  const m = raw.trim().toLowerCase().match(/(\d{1,2})\s+(?:de\s+)?([a-záéíóúü]+)\s+(?:de\s+)?(\d{4})/);
+  if (m) {
+    const mes = MESES[m[2]];
+    if (mes) return `${m[3]}-${mes}-${m[1].padStart(2, "0")}`;
+  }
+  // DD/MM/YYYY or MM/DD/YYYY — try DD/MM/YYYY
+  const slash = raw.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slash) return `${slash[3]}-${slash[2].padStart(2,"0")}-${slash[1].padStart(2,"0")}`;
+  return raw.trim();
+}
+
 // Columns match the exact headers used in the Aviva Sheets directory export.
 // "Antigüedad" and "Descripción" are intentionally omitted — calculated/unused.
 const TARGETS = [
@@ -15,7 +35,6 @@ const TARGETS = [
   { id: "numColaborador", label: "No de colaborador",    required: true,  hints: ["No de colaborador", "Número colaborador", "Num colaborador"] },
   { id: "role",           label: "Puesto",               required: true,  hints: ["Puesto", "Cargo"] },
   { id: "hiredAt",        label: "Fecha de ingreso",     required: false, hints: ["Fecha de Ingreso", "Fecha ingreso"] },
-  { id: "dealOwner",      label: "Deal Owner",           required: false, hints: ["Deal Owner", "Deal owner"] },
   { id: "genero",         label: "Hombre/Mujer",         required: false, hints: ["Hombre/Mujer", "Género", "Genero"] },
   { id: "talla",          label: "Tallas",               required: false, hints: ["Tallas", "Talla"] },
   { id: "email",          label: "Correo",               required: true,  hints: ["Correo", "Email", "E-mail"] },
@@ -53,7 +72,7 @@ function parseCSV(text: string): string[][] {
 
 function downloadTemplate() {
   // Headers match the Aviva directory Google Sheets export column order exactly.
-  const csv = "Empresa,Región,Quiosco,Estado,Nombre completo,No de colaborador,Puesto,Fecha de Ingreso,Antigüedad,Deal Owner,Hombre/Mujer,Tallas,Correo,Descripción,Área,Jefe Inmediato,HubSpot ID";
+  const csv = "Empresa,Hub o equipo,Quiosco,Estado,Nombre completo,No de colaborador,Puesto,Fecha de Ingreso,Antigüedad,Hombre/Mujer,Tallas,Correo,Descripción,Área,Jefe Inmediato,HubSpot ID";
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
   a.download = "plantilla-colaboradores-aviva.csv";
@@ -140,24 +159,26 @@ export function ImportWizard({ onClose, onImported }: Props) {
             email:          row.mapped.email        ?? "",
             role:           row.mapped.role         ?? "",
             empresa:        row.mapped.empresa      ?? "",
-            region:         row.mapped.region        ?? "",
             quiosco:        row.mapped.quiosco      ?? "",
             estado:         row.mapped.estado       ?? "",
             area:           row.mapped.area         ?? "",
             managerName:    row.mapped.managerName  ?? null,
             manager:        null,
-            hiredAt:        row.mapped.hiredAt      ?? new Date().toISOString().slice(0, 10),
-            dealOwner:      (row.mapped.dealOwner ?? "").toUpperCase() === "TRUE",
+            hiredAt:        parseDate(row.mapped.hiredAt ?? "") || new Date().toISOString().slice(0, 10),
             genero:         (row.mapped.genero ?? "") as "H" | "M",
             talla:          row.mapped.talla        ?? "",
             phone:          row.mapped.phone        ?? "",
             hubspot:        row.mapped.hubspot      || null,
+            region:         (row.mapped.region ?? "").toLowerCase().replace(/\s+/g, "_"),
             status:         "invited",
             access:         [],
             tablets:        [],
             laptop:         null,
             hireMonths:     0,
-            avatar:         { initials: (name[0] ?? "?").toUpperCase(), color: "c1" },
+            avatar:         {
+              initials: ((parts[0]?.[0] ?? "?") + (parts[parts.length > 1 ? parts.length - 1 : 0]?.[0] ?? "")).toUpperCase(),
+              color: "c1",
+            },
           });
         })
       );
