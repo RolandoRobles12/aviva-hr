@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { createDoc, updateDocById } from "@/hooks/useFirestore";
 import { useLocations } from "@/hooks/useLocations";
+import { writeAuditEntry } from "@/services/audit";
 
 const ESTADOS_MX = [
   "Aguascalientes", "Baja California", "Baja California Sur", "Campeche",
@@ -170,7 +171,7 @@ export function LocationImportWizard({ onClose, onImported }: Props) {
   async function doImport() {
     setImporting(true);
     try {
-      const toImport = validation.rows.filter((r) => r.sev !== "err");
+      const toImport = validation.rows;
       await Promise.all(
         toImport.map((row) => {
           const producto  = row.mapped.producto  ?? "";
@@ -200,6 +201,11 @@ export function LocationImportWizard({ onClose, onImported }: Props) {
             : createDoc("locations", payload);
         })
       );
+      await writeAuditEntry({
+        action: "importó locaciones",
+        target: `${validation.total} filas (${validation.ok} OK · ${validation.warn} avisos · ${validation.err} incompletos)`,
+        source: "manual",
+      });
       onImported?.({ ok: validation.ok, warn: validation.warn, err: validation.err, total: validation.total });
       setStep(3);
     } finally {
@@ -353,9 +359,9 @@ export function LocationImportWizard({ onClose, onImported }: Props) {
                 ))}
               </div>
               {validation.err > 0 && (
-                <div className="flex items-center gap-2 px-4 py-3 rounded-[var(--radius-sm)] bg-[var(--color-danger-bg)] text-[var(--color-danger-fg)] text-[13px] mb-4">
+                <div className="flex items-center gap-2 px-4 py-3 rounded-[var(--radius-sm)] bg-[#fff3d6] text-[#8a5a00] text-[13px] mb-4">
                   <Warn size={14} />
-                  <span>Hay {validation.err} fila{validation.err > 1 ? "s" : ""} con errores que no se importarán.</span>
+                  <span>Hay {validation.err} fila{validation.err > 1 ? "s" : ""} con datos incompletos — se importarán con los campos disponibles.</span>
                 </div>
               )}
               <div className="overflow-auto rounded-[var(--radius-sm)] border border-[var(--color-line)]">
@@ -448,9 +454,8 @@ export function LocationImportWizard({ onClose, onImported }: Props) {
             <Button variant="primary" onClick={() => setStep(2)}>Continuar →</Button>
           )}
           {step === 2 && (
-            <Button variant="primary" onClick={doImport}
-              disabled={(validation.err === validation.total && validation.total > 0) || importing}>
-              {importing ? "Importando…" : `Importar ${validation.ok + validation.warn} locaciones`}
+            <Button variant="primary" onClick={doImport} disabled={importing || validation.total === 0}>
+              {importing ? "Importando…" : `Importar ${validation.total} locaciones`}
             </Button>
           )}
         </div>
