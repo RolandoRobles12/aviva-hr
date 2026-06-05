@@ -48,7 +48,6 @@ function NewUserModal({ onClose }: { onClose: () => void }) {
   const [talla,   setTalla]     = useState("M");
   const [phone,   setPhone]     = useState("");
   const [managerId, setManagerId] = useState("");
-  const [dealOwner, setDealOwner] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -60,7 +59,6 @@ function NewUserModal({ onClose }: { onClose: () => void }) {
         fullName: `${first} ${last}`,
         email, role, area, region, quiosco, estado, empresa,
         genero, talla, phone,
-        dealOwner,
         manager: managerId || null,
         managerName: mgr?.fullName ?? null,
         avatar: {
@@ -177,10 +175,6 @@ function NewUserModal({ onClose }: { onClose: () => void }) {
               <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Teléfono</label>
               <input className={inputClass} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+52 55 0000 0000" />
             </div>
-            <div className="col-span-2 flex items-center gap-2">
-              <input type="checkbox" id="dealOwner" checked={dealOwner} onChange={(e) => setDealOwner(e.target.checked)} className="cursor-pointer" />
-              <label htmlFor="dealOwner" className="text-[13px] text-[var(--color-ink-2)] cursor-pointer">Deal Owner en HubSpot</label>
-            </div>
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" size="sm" onClick={onClose}>Cancelar</Button>
@@ -226,20 +220,72 @@ function KPIs({ users }: { users: (User & { id: string })[] }) {
 
 // ── User drawer ───────────────────────────────────────────────────────────────
 function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; allUsers: (User & { id: string })[]; onClose: () => void }) {
-  const { regionLabel } = useCatalog();
+  const { regions, regionLabel, estados } = useCatalog();
   const { data: integrations } = useIntegrations();
+  const { notify } = useNotif();
+  const { data: positions } = useCollection<{ name: string }>("catalog/positions/items");
+  const { data: quioscos } = useCollection<{ name: string }>("catalog/quioscos/items");
   const [tab, setTab] = useState<"info" | "access" | "devices">("info");
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const manager = allUsers.find((u) => u.id === user.manager);
+
+  const [role,      setRole]      = useState(user.role);
+  const [area,      setArea]      = useState(user.area ?? "");
+  const [region,    setRegion]    = useState(user.region ?? "");
+  const [estado,    setEstado]    = useState(user.estado ?? "");
+  const [quiosco,   setQuiosco]   = useState(user.quiosco ?? "");
+  const [empresa,   setEmpresa]   = useState(user.empresa ?? "Aviva Crédito");
+  const [managerId, setManagerId] = useState(user.manager ?? "");
+  const [talla,     setTalla]     = useState(user.talla ?? "M");
+  const [phone,     setPhone]     = useState(user.phone ?? "");
+  const [first,     setFirst]     = useState(user.first ?? "");
+  const [last,      setLast]      = useState(user.last ?? "");
+
+  function cancelEdit() {
+    setRole(user.role); setArea(user.area ?? ""); setRegion(user.region ?? "");
+    setEstado(user.estado ?? ""); setQuiosco(user.quiosco ?? "");
+    setEmpresa(user.empresa ?? "Aviva Crédito"); setManagerId(user.manager ?? "");
+    setTalla(user.talla ?? "M"); setPhone(user.phone ?? "");
+    setFirst(user.first ?? ""); setLast(user.last ?? "");
+    setEditing(false);
+  }
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const mgr = allUsers.find((u) => u.id === managerId);
+      await updateUser(user.id, {
+        first, last,
+        fullName: `${first} ${last}`,
+        role, area, region, estado, quiosco, empresa,
+        manager: managerId || null,
+        managerName: mgr?.fullName ?? null,
+        talla, phone,
+        avatar: {
+          initials: (first[0] ?? "?").toUpperCase() + (last[0] ?? "").toUpperCase(),
+          color: user.avatar.color,
+        },
+      });
+      notify({ title: "Perfil actualizado", body: `${first} ${last} fue actualizado correctamente.`, kind: "onboard" });
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function handleStatusChange(status: User["status"]) {
     await updateUser(user.id, { status }, `cambió estado a ${status}`);
   }
 
+  const inputClass = "h-9 w-full px-3 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)] text-[13px] outline-none";
+
   return (
-    <Drawer open onClose={onClose} title={user.fullName} subtitle={`${user.role} · ${user.quiosco}, ${user.estado}`}>
+    <Drawer open onClose={onClose} title={editing ? "Editar perfil" : user.fullName} subtitle={editing ? "" : `${user.role} · ${user.quiosco}, ${user.estado}`}>
       <div>
-        <div className="flex border-b border-[var(--color-line)] px-6">
-          {(["info", "access", "devices"] as const).map((t) => (
+        <div className="flex items-center border-b border-[var(--color-line)] px-6">
+          {!editing && (["info", "access", "devices"] as const).map((t) => (
             <button key={t} onClick={() => setTab(t)}
               className={cn("px-3 py-3 text-[13px] font-medium border-b-2 -mb-px transition-colors",
                 tab === t ? "border-green-500 text-[var(--color-ink)]" : "border-transparent text-[var(--color-ink-3)] hover:text-[var(--color-ink)]"
@@ -247,10 +293,17 @@ function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; 
               {t === "info" ? "Información" : t === "access" ? "Accesos" : "Equipo"}
             </button>
           ))}
+          {editing && <span className="py-3 text-[13px] font-medium text-[var(--color-ink)]">Información</span>}
+          {!editing && tab === "info" && (
+            <button onClick={() => setEditing(true)}
+              className="ml-auto px-3 py-1.5 text-[12px] font-medium rounded-[var(--radius-sm)] border border-[var(--color-line)] text-[var(--color-ink-2)] hover:bg-[var(--color-surface-2)] transition-colors">
+              Editar
+            </button>
+          )}
         </div>
 
         <div className="px-6 py-5 space-y-5">
-          {tab === "info" && (
+          {tab === "info" && !editing && (
             <>
               <div className="flex items-center gap-4">
                 <Avatar user={user} size="lg" />
@@ -261,16 +314,16 @@ function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; 
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
                 {[
-                  ["Email",        user.email],
-                  ["Teléfono",     user.phone],
-                  ["Área",         user.area ?? "—"],
-                  ["Región", regionLabel(user.region)],
-                  ["Empresa",      user.empresa],
+                  ["Email",          user.email],
+                  ["Teléfono",       user.phone],
+                  ["Área",           user.area ?? "—"],
+                  ["Región",         regionLabel(user.region)],
+                  ["Empresa",        user.empresa],
                   ["Jefe inmediato", manager?.fullName ?? user.managerName ?? "—"],
-                  ["Ingreso",      user.hiredAt],
-                  ["Antigüedad",   `${user.hireMonths} meses`],
-                  ["Talla",        user.talla],
-                  ["Deal Owner",   user.dealOwner ? "Sí" : "No"],
+                  ["Ingreso",        user.hiredAt],
+                  ["Antigüedad",     `${user.hireMonths} meses`],
+                  ["Talla",          user.talla],
+                  ["Deal Owner",     user.hubspot ? "Sí" : "No"],
                 ].map(([label, value]) => (
                   <div key={label}>
                     <div className="text-[11px] text-[var(--color-ink-4)] mb-0.5">{label}</div>
@@ -293,6 +346,87 @@ function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; 
                 </select>
               </div>
             </>
+          )}
+
+          {tab === "info" && editing && (
+            <form onSubmit={handleSave} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Nombre *</label>
+                  <input className={inputClass} required value={first} onChange={(e) => setFirst(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Apellidos *</label>
+                  <input className={inputClass} required value={last} onChange={(e) => setLast(e.target.value)} />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Puesto *</label>
+                  <select className={inputClass} required value={role} onChange={(e) => setRole(e.target.value)}>
+                    <option value="">Seleccionar puesto…</option>
+                    {positions.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Área</label>
+                  <select className={inputClass} value={area} onChange={(e) => setArea(e.target.value)}>
+                    <option value="">Sin asignar</option>
+                    {AREAS.map((a) => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Jefe inmediato</label>
+                  <select className={inputClass} value={managerId} onChange={(e) => setManagerId(e.target.value)}>
+                    <option value="">Sin asignar</option>
+                    {allUsers.filter((u) => u.id !== user.id).map((u) => <option key={u.id} value={u.id}>{u.fullName}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Región</label>
+                  <select className={inputClass} value={region} onChange={(e) => setRegion(e.target.value)}>
+                    <option value="">Sin asignar</option>
+                    {regions.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Estado</label>
+                  <select className={inputClass} value={estado} onChange={(e) => setEstado(e.target.value)}>
+                    <option value="">Sin asignar</option>
+                    {estados.map((est) => <option key={est} value={est}>{est}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Quiósco</label>
+                  <select className={inputClass} value={quiosco} onChange={(e) => setQuiosco(e.target.value)}>
+                    <option value="">Sin asignar</option>
+                    {quioscos.map((q) => <option key={q.id} value={q.name}>{q.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Empresa</label>
+                  <select className={inputClass} value={empresa} onChange={(e) => setEmpresa(e.target.value)}>
+                    <option value="Aviva Crédito">Aviva Crédito</option>
+                    <option value="Aviva Financial">Aviva Financial</option>
+                    <option value="Ejecutando Ideas">Ejecutando Ideas</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Talla</label>
+                  <select className={inputClass} value={talla} onChange={(e) => setTalla(e.target.value)}>
+                    {TALLAS.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Teléfono</label>
+                  <input className={inputClass} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+52 55 0000 0000" />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="secondary" size="sm" onClick={cancelEdit}>Cancelar</Button>
+                <Button type="submit" variant="primary" size="sm" disabled={saving}>
+                  {saving ? "Guardando…" : "Guardar cambios"}
+                </Button>
+              </div>
+            </form>
           )}
 
           {tab === "access" && (
