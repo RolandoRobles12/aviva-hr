@@ -136,18 +136,24 @@ export function LocationImportWizard({ onClose, onImported }: Props) {
     reader.readAsText(f);
   }
 
+  function processRow(r: string[], idx: number) {
+    const mapped: Partial<Record<TargetId, string>> = {};
+    TARGETS.forEach((t) => {
+      const colIdx = mapping[t.id];
+      if (colIdx == null) return;
+      mapped[t.id] = (r[colIdx] || "").trim();
+    });
+    const existing = existingLocations.find((l) => l.code === mapped.code);
+    return { idx, mapped, existingId: existing?.id ?? null };
+  }
+
   const validation = useMemo(() => {
     if (!parsedRows.length) return { ok: 0, warn: 0, err: 0, rows: [], total: 0 };
     const requiredIds = TARGETS.filter((t) => t.required).map((t) => t.id);
     let ok = 0, warn = 0, err = 0;
     const rows = parsedRows.slice(0, 100).map((r, idx) => {
+      const { mapped, existingId } = processRow(r, idx);
       const issues: { kind: "ok" | "warn" | "err"; msg: string }[] = [];
-      const mapped: Partial<Record<TargetId, string>> = {};
-      TARGETS.forEach((t) => {
-        const colIdx = mapping[t.id];
-        if (colIdx == null) return;
-        mapped[t.id] = (r[colIdx] || "").trim();
-      });
       requiredIds.forEach((rid) => {
         if (!mapped[rid as TargetId]) issues.push({ kind: "err", msg: `Falta ${rid}` });
       });
@@ -160,18 +166,18 @@ export function LocationImportWizard({ onClose, onImported }: Props) {
       if (!mapped.fechaApertura) {
         issues.push({ kind: "warn", msg: "Sin fecha de apertura" });
       }
-      const existing = existingLocations.find((l) => l.code === mapped.code);
       const sev = issues.some((i) => i.kind === "err") ? "err" : issues.some((i) => i.kind === "warn") ? "warn" : "ok";
       if (sev === "err") err++; else if (sev === "warn") warn++; else ok++;
-      return { idx, mapped, issues, sev, existingId: existing?.id ?? null };
+      return { idx, mapped, issues, sev, existingId };
     });
     return { ok, warn, err, rows, total: parsedRows.length };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parsedRows, mapping, existingLocations]);
 
   async function doImport() {
     setImporting(true);
     try {
-      const toImport = validation.rows;
+      const toImport = parsedRows.map((r, idx) => processRow(r, idx));
       await Promise.all(
         toImport.map((row) => {
           const producto  = row.mapped.producto  ?? "";
