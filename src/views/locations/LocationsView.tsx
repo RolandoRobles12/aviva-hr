@@ -5,7 +5,7 @@ import { useUsers } from "@/hooks/useUsers";
 import { LoadingView, ErrorView } from "@/components/ui/Spinner";
 import { Button } from "@/components/ui/Button";
 import { Drawer } from "@/components/ui/Drawer";
-import { Search, Plus, ChevronRight, Close, Upload } from "@/components/icons";
+import { Search, Plus, ChevronRight, Close, Upload, ArrowUpDown } from "@/components/icons";
 import { cn } from "@/lib/cn";
 import { monthsSince } from "@/lib/dates";
 import { useCatalog } from "@/context/CatalogContext";
@@ -268,6 +268,8 @@ function LocationDetail({
   );
 }
 
+type SortCol = "code" | "catLabel" | "ciudad" | "estado" | "gerente" | "fechaApertura" | "status";
+
 export function LocationsView() {
   const { estados } = useCatalog();
   const { data: locations, loading, error } = useLocations();
@@ -275,13 +277,20 @@ export function LocationsView() {
   const [estadoF,   setEstadoF]   = useState("all");
   const [statusF,   setStatusF]   = useState("all");
   const [productoF, setProductoF] = useState("all");
+  const [sortCol,   setSortCol]   = useState<SortCol>("code");
+  const [sortDir,   setSortDir]   = useState<"asc" | "desc">("asc");
   const [selected,   setSelected]   = useState<(Location & { id: string }) | null>(null);
   const [locModal,   setLocModal]   = useState<(Location & { id: string }) | "new" | null>(null);
   const [importing,  setImporting]  = useState(false);
 
+  function handleSort(col: SortCol) {
+    if (sortCol === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortCol(col); setSortDir("asc"); }
+  }
+
   const filtered = useMemo(() => {
     const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-    return locations.filter((l) => {
+    const base = locations.filter((l) => {
       if (estadoF   !== "all" && l.estado   !== estadoF)   return false;
       if (statusF   !== "all" && l.status   !== statusF)   return false;
       if (productoF !== "all" && l.producto !== productoF) return false;
@@ -296,7 +305,19 @@ export function LocationsView() {
       }
       return true;
     });
-  }, [locations, query, estadoF, statusF, productoF]);
+    return [...base].sort((a, b) => {
+      let va: string, vb: string;
+      if (sortCol === "fechaApertura") {
+        va = a.fechaApertura ?? "";
+        vb = b.fechaApertura ?? "";
+      } else {
+        va = String(a[sortCol] ?? "");
+        vb = String(b[sortCol] ?? "");
+      }
+      const cmp = va.localeCompare(vb, "es", { numeric: true });
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [locations, query, estadoF, statusF, productoF, sortCol, sortDir]);
 
   if (loading) return <LoadingView />;
   if (error)   return <ErrorView message={error.message} />;
@@ -343,8 +364,29 @@ export function LocationsView() {
         <table className="w-full min-w-[750px] border-collapse text-[13px]">
           <thead className="sticky top-0 z-10">
             <tr className="border-b border-[var(--color-line)] bg-[var(--color-surface-2)]">
-              {["Locación", "Categoría", "Ciudad", "Estado", "Gerente", "Apertura", "Estatus", ""].map((h) => (
-                <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-4)]">{h}</th>
+              {([
+                ["Locación",   "code"],
+                ["Categoría",  "catLabel"],
+                ["Ciudad",     "ciudad"],
+                ["Estado",     "estado"],
+                ["Gerente",    "gerente"],
+                ["Apertura",   "fechaApertura"],
+                ["Estatus",    "status"],
+                ["",           null],
+              ] as [string, SortCol | null][]).map(([label, col]) => (
+                <th key={label}
+                  className={cn("px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-4)] whitespace-nowrap",
+                    col && "cursor-pointer select-none hover:text-[var(--color-ink-2)] transition-colors"
+                  )}
+                  onClick={col ? () => handleSort(col) : undefined}>
+                  <span className="inline-flex items-center gap-1">
+                    {label}
+                    {col && sortCol === col
+                      ? <span className="text-green-600">{sortDir === "asc" ? "↑" : "↓"}</span>
+                      : col && <ArrowUpDown size={11} className="opacity-30" />
+                    }
+                  </span>
+                </th>
               ))}
             </tr>
           </thead>
