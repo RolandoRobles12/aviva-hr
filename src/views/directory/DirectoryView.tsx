@@ -12,6 +12,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { StatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Drawer } from "@/components/ui/Drawer";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { LoadingView, ErrorView } from "@/components/ui/Spinner";
 import { ImportWizard } from "./ImportWizard";
 import {
@@ -147,10 +148,13 @@ function NewUserModal({ onClose }: { onClose: () => void }) {
             </div>
             <div>
               <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Quiósco</label>
-              <select className={inputClass} value={quiosco} onChange={(e) => setQuiosco(e.target.value)}>
-                <option value="">Sin asignar</option>
-                {locations.map((l) => { const name = l.ubicacion ?? l.ciudad; return <option key={l.id} value={name}>{name}</option>; })}
-              </select>
+              <SearchableSelect
+                value={quiosco}
+                onChange={setQuiosco}
+                placeholder="Buscar quiósco…"
+                emptyLabel="Sin asignar"
+                options={locations.map((l) => ({ value: l.ubicacion ?? l.ciudad, label: l.ubicacion ?? l.ciudad, sub: l.code }))}
+              />
             </div>
             <div>
               <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Empresa</label>
@@ -398,10 +402,13 @@ function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; 
                 </div>
                 <div>
                   <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Quiósco</label>
-                  <select className={inputClass} value={quiosco} onChange={(e) => setQuiosco(e.target.value)}>
-                    <option value="">Sin asignar</option>
-                    {locations.map((l) => { const name = l.ubicacion ?? l.ciudad; return <option key={l.id} value={name}>{name}</option>; })}
-                  </select>
+                  <SearchableSelect
+                    value={quiosco}
+                    onChange={setQuiosco}
+                    placeholder="Buscar quiósco…"
+                    emptyLabel="Sin asignar"
+                    options={locations.map((l) => ({ value: l.ubicacion ?? l.ciudad, label: l.ubicacion ?? l.ciudad, sub: l.code }))}
+                  />
                 </div>
                 <div>
                   <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Empresa</label>
