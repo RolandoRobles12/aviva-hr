@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { createDoc, updateDocById } from "@/hooks/useFirestore";
 import { useUsers } from "@/hooks/useUsers";
+import { useLocations } from "@/hooks/useLocations";
 import { writeAuditEntry } from "@/services/audit";
 
 const MESES: Record<string, string> = {
@@ -90,6 +91,17 @@ interface Props {
 
 export function ImportWizard({ onClose, onImported }: Props) {
   const { data: existingUsers } = useUsers();
+  const { data: locations } = useLocations();
+
+  function resolveQuiosco(raw: string): string {
+    if (!raw) return "";
+    const n = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+    const match = locations.find((l) => {
+      const display = l.ubicacion ?? l.ciudad;
+      return n(display) === n(raw) || n(l.ciudad) === n(raw) || n(l.code) === n(raw);
+    });
+    return match ? (match.ubicacion ?? match.ciudad) : raw;
+  }
   const [step, setStep]               = useState(0);
   const [file, setFile]               = useState<File | null>(null);
   const [parsedRows, setParsedRows]   = useState<string[][]>([]);
@@ -171,7 +183,7 @@ export function ImportWizard({ onClose, onImported }: Props) {
             email:          row.mapped.email        ?? "",
             role:           row.mapped.role         ?? "",
             empresa:        row.mapped.empresa      ?? "",
-            quiosco:        row.mapped.quiosco      ?? "",
+            quiosco:        resolveQuiosco(row.mapped.quiosco ?? ""),
             estado:         row.mapped.estado       ?? "",
             area:           row.mapped.area         ?? "",
             managerName:    row.mapped.managerName  ?? null,
