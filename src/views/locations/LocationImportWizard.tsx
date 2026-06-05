@@ -2,7 +2,8 @@ import { useState, useMemo, useRef } from "react";
 import { Check, Close, Download, Upload, Warn } from "@/components/icons";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
-import { createDoc } from "@/hooks/useFirestore";
+import { createDoc, updateDocById } from "@/hooks/useFirestore";
+import { useLocations } from "@/hooks/useLocations";
 
 const ESTADOS_MX = [
   "Aguascalientes", "Baja California", "Baja California Sur", "Campeche",
@@ -99,6 +100,7 @@ interface Props {
 }
 
 export function LocationImportWizard({ onClose, onImported }: Props) {
+  const { data: existingLocations } = useLocations();
   const [step, setStep]             = useState(0);
   const [file, setFile]             = useState<File | null>(null);
   const [parsedRows, setParsedRows] = useState<string[][]>([]);
@@ -157,12 +159,13 @@ export function LocationImportWizard({ onClose, onImported }: Props) {
       if (!mapped.fechaApertura) {
         issues.push({ kind: "warn", msg: "Sin fecha de apertura" });
       }
+      const existing = existingLocations.find((l) => l.code === mapped.code);
       const sev = issues.some((i) => i.kind === "err") ? "err" : issues.some((i) => i.kind === "warn") ? "warn" : "ok";
       if (sev === "err") err++; else if (sev === "warn") warn++; else ok++;
-      return { idx, mapped, issues, sev };
+      return { idx, mapped, issues, sev, existingId: existing?.id ?? null };
     });
     return { ok, warn, err, rows, total: parsedRows.length };
-  }, [parsedRows, mapping]);
+  }, [parsedRows, mapping, existingLocations]);
 
   async function doImport() {
     setImporting(true);
@@ -173,7 +176,7 @@ export function LocationImportWizard({ onClose, onImported }: Props) {
           const producto  = row.mapped.producto  ?? "";
           const categoria = row.mapped.categoria ?? "";
           const cat       = getCatFields(producto, categoria);
-          return createDoc("locations", {
+          const payload = {
             code:          row.mapped.code          ?? "",
             ciudad:        row.mapped.ciudad        ?? "",
             estado:        normalizeEstado(row.mapped.estado ?? ""),
@@ -191,7 +194,10 @@ export function LocationImportWizard({ onClose, onImported }: Props) {
             catShort:      cat.short,
             catColor:      cat.color,
             catBg:         cat.bg,
-          });
+          };
+          return row.existingId
+            ? updateDocById("locations", row.existingId, payload)
+            : createDoc("locations", payload);
         })
       );
       onImported?.({ ok: validation.ok, warn: validation.warn, err: validation.err, total: validation.total });
@@ -357,6 +363,7 @@ export function LocationImportWizard({ onClose, onImported }: Props) {
                   <thead className="sticky top-0 bg-[var(--color-surface-2)]">
                     <tr>
                       <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--color-ink-4)] w-8">#</th>
+                      <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--color-ink-4)]">Acción</th>
                       <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--color-ink-4)]">Estado</th>
                       {TARGETS.filter((t) => mapping[t.id] != null).map((t) => (
                         <th key={t.id} className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--color-ink-4)] whitespace-nowrap">{t.label}</th>
@@ -371,6 +378,12 @@ export function LocationImportWizard({ onClose, onImported }: Props) {
                         : ""
                       )}>
                         <td className="px-3 py-2 font-mono text-[var(--color-ink-4)]">{row.idx + 1}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {row.existingId
+                            ? <span className="text-[11px] font-medium px-1.5 py-0.5 rounded-full bg-[#e3eeff] text-[#1b3f8a]">Actualizar</span>
+                            : <span className="text-[11px] font-medium px-1.5 py-0.5 rounded-full bg-[var(--color-mint-50)] text-green-700">Nuevo</span>
+                          }
+                        </td>
                         <td className="px-3 py-2">
                           {row.sev === "ok"   && <span className="text-green-600 text-[11px] font-medium">OK</span>}
                           {row.sev === "warn" && <span className="text-[#8a5a00] text-[11px] font-medium">{row.issues[0]?.msg}</span>}
