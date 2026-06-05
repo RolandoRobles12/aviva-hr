@@ -879,7 +879,7 @@ function EditScopesModal({ apiKey, onClose }: { apiKey: ApiKeyDoc; onClose: () =
     setSaving(true);
     try {
       await updateDocById("apiKeys", apiKey.id, { scopes });
-      notify({ title: "Scopes actualizados", body: `Los permisos de "${apiKey.name}" fueron guardados.`, kind: "success" });
+      notify({ title: "Scopes actualizados", body: `Los permisos de "${apiKey.name}" fueron guardados.`, kind: "info" });
       onClose();
     } finally {
       setSaving(false);
