@@ -4,6 +4,7 @@ import { useUsers } from "@/hooks/useUsers";
 import { useIntegrations } from "@/hooks/useIntegrations";
 import { updateUser, createUser } from "@/services/users";
 import { useCollection } from "@/hooks/useFirestore";
+import { useLocations } from "@/hooks/useLocations";
 import { useCatalog } from "@/context/CatalogContext";
 import { useNotif } from "@/context/NotifContext";
 import type { User } from "@/data/types";
@@ -31,7 +32,7 @@ function NewUserModal({ onClose }: { onClose: () => void }) {
   const { regions, estados } = useCatalog();
   const { notify } = useNotif();
   const { data: positions } = useCollection<{ name: string }>("catalog/positions/items");
-  const { data: quioscos } = useCollection<{ name: string }>("catalog/quioscos/items");
+  const { data: locations } = useLocations();
   const { data: allUsers } = useUsers();
   const [saving, setSaving] = useState(false);
 
@@ -148,7 +149,7 @@ function NewUserModal({ onClose }: { onClose: () => void }) {
               <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Quiósco</label>
               <select className={inputClass} value={quiosco} onChange={(e) => setQuiosco(e.target.value)}>
                 <option value="">Sin asignar</option>
-                {quioscos.map((q) => <option key={q.id} value={q.name}>{q.name}</option>)}
+                {locations.map((l) => { const name = l.ubicacion ?? l.ciudad; return <option key={l.id} value={name}>{name}</option>; })}
               </select>
             </div>
             <div>
@@ -225,7 +226,7 @@ function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; 
   const { data: integrations } = useIntegrations();
   const { notify } = useNotif();
   const { data: positions } = useCollection<{ name: string }>("catalog/positions/items");
-  const { data: quioscos } = useCollection<{ name: string }>("catalog/quioscos/items");
+  const { data: locations } = useLocations();
   const [tab, setTab] = useState<"info" | "access" | "devices">("info");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -399,7 +400,7 @@ function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; 
                   <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Quiósco</label>
                   <select className={inputClass} value={quiosco} onChange={(e) => setQuiosco(e.target.value)}>
                     <option value="">Sin asignar</option>
-                    {quioscos.map((q) => <option key={q.id} value={q.name}>{q.name}</option>)}
+                    {locations.map((l) => { const name = l.ubicacion ?? l.ciudad; return <option key={l.id} value={name}>{name}</option>; })}
                   </select>
                 </div>
                 <div>
