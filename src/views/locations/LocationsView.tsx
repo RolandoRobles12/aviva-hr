@@ -17,17 +17,10 @@ const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }
   closed: { label: "Inactivo", color: "#6b716b", bg: "#f1f1ee" },
 };
 
-const CAT_MAP: Record<string, { label: string; short: string; color: string; bg: string }> = {
-  "Aviva tu Compra":      { label: "Aviva tu Compra",      short: "AtC", color: "#1b3f8a", bg: "#e3eeff" },
-  "Aviva tu Negocio":     { label: "Aviva tu Negocio",     short: "AtN", color: "#026149", bg: "#e7f8ef" },
-  "Casa Marchand":        { label: "Casa Marchand",        short: "CM",  color: "#5c2e8e", bg: "#ece2f5" },
-  "Aviva tu Compra · BA": { label: "Aviva tu Compra · BA", short: "BA",  color: "#8a5a00", bg: "#fff3d6" },
-  "Corporativo":          { label: "Corporativo",          short: "Corp",color: "#3a3a3a", bg: "#f1f1ee" },
-};
-const DEFAULT_CAT = { label: "Quiósco", short: "Q", color: "#1b3f8a", bg: "#e3eeff" };
+const DEFAULT_CAT = { label: "Sin producto", short: "?", color: "#6b716b", bg: "#f1f1ee" };
 
-function getCatFields(producto: string) {
-  return CAT_MAP[producto] ?? DEFAULT_CAT;
+function initials(name: string) {
+  return name.split(/\s+/).map((w) => w[0] ?? "").join("").slice(0, 3).toUpperCase();
 }
 
 // ── Location Modal ─────────────────────────────────────────────────────────────
@@ -38,7 +31,7 @@ function LocationModal({
   loc: (Location & { id: string }) | "new";
   onClose: () => void;
 }) {
-  const { estados, regions } = useCatalog();
+  const { estados, regions, products } = useCatalog();
   const { notify } = useNotif();
   const { data: allUsers } = useUsers();
   const isNew = loc === "new";
@@ -60,15 +53,15 @@ function LocationModal({
     e.preventDefault();
     setSaving(true);
     try {
-      const catFields = getCatFields(producto);
+      const prod = products.find((p) => p.name === producto);
       const allFields = {
         code, ciudad, estado, direccion, gerente, region,
         fechaApertura, status, producto, ubicacion,
         categoria: producto,
-        catLabel: catFields.label,
-        catShort: catFields.short,
-        catColor: catFields.color,
-        catBg: catFields.bg,
+        catLabel: prod?.name    ?? producto || DEFAULT_CAT.label,
+        catShort: prod ? initials(prod.name) : DEFAULT_CAT.short,
+        catColor: prod?.color   ?? DEFAULT_CAT.color,
+        catBg:    prod?.bg      ?? DEFAULT_CAT.bg,
       };
       if (isNew) {
         await createDoc("locations", allFields);
@@ -158,7 +151,7 @@ function LocationModal({
               <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Producto</label>
               <select className={inputClass} value={producto} onChange={(e) => setProducto(e.target.value)}>
                 <option value="">Sin asignar</option>
-                {Object.keys(CAT_MAP).map((p) => <option key={p} value={p}>{p}</option>)}
+                {products.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
               </select>
             </div>
             <div className="col-span-2">
@@ -271,7 +264,7 @@ function LocationDetail({
 type SortCol = "code" | "catLabel" | "ciudad" | "estado" | "gerente" | "fechaApertura" | "status";
 
 export function LocationsView() {
-  const { estados } = useCatalog();
+  const { estados, products } = useCatalog();
   const { notify } = useNotif();
   const { data: locations, loading, error } = useLocations();
   const [query,      setQuery]      = useState("");
@@ -382,7 +375,7 @@ export function LocationsView() {
         <select value={productoF} onChange={(e) => setProductoF(e.target.value)}
           className="h-8 px-2 text-[12.5px] rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-2)] outline-none">
           <option value="all">Todos los productos</option>
-          {Object.keys(CAT_MAP).map((p) => <option key={p} value={p}>{p}</option>)}
+          {products.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
         </select>
         <div className="ml-auto flex items-center gap-2">
           <span className="text-[12px] text-[var(--color-ink-4)]">{filtered.length} locaciones</span>

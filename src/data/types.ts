@@ -7,6 +7,14 @@ export interface Region {
   leader: string;
 }
 
+export interface Product {
+  id?: string;
+  name: string;
+  tagline: string;
+  color: string;
+  bg: string;
+}
+
 export interface Quiosco {
   name: string;
   estado: string;
