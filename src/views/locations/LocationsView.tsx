@@ -272,21 +272,53 @@ type SortCol = "code" | "catLabel" | "ciudad" | "estado" | "gerente" | "fechaApe
 
 export function LocationsView() {
   const { estados } = useCatalog();
+  const { notify } = useNotif();
   const { data: locations, loading, error } = useLocations();
-  const [query,     setQuery]     = useState("");
-  const [estadoF,   setEstadoF]   = useState("all");
-  const [statusF,   setStatusF]   = useState("all");
-  const [productoF, setProductoF] = useState("all");
-  const [sortCol,   setSortCol]   = useState<SortCol>("code");
-  const [sortDir,   setSortDir]   = useState<"asc" | "desc">("asc");
+  const [query,      setQuery]      = useState("");
+  const [estadoF,    setEstadoF]    = useState("all");
+  const [statusF,    setStatusF]    = useState("all");
+  const [productoF,  setProductoF]  = useState("all");
+  const [sortCol,    setSortCol]    = useState<SortCol>("code");
+  const [sortDir,    setSortDir]    = useState<"asc" | "desc">("asc");
   const [selected,   setSelected]   = useState<(Location & { id: string }) | null>(null);
   const [locModal,   setLocModal]   = useState<(Location & { id: string }) | "new" | null>(null);
   const [importing,  setImporting]  = useState(false);
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  const [deleting,   setDeleting]   = useState(false);
 
   function handleSort(col: SortCol) {
     if (sortCol === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else { setSortCol(col); setSortDir("asc"); }
   }
+
+  function toggleCheck(id: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll(e: React.ChangeEvent<HTMLInputElement>) {
+    if (e.target.checked) setCheckedIds(new Set(filtered.map((l) => l.id)));
+    else setCheckedIds(new Set());
+  }
+
+  async function handleBulkDelete() {
+    if (!confirm(`¿Eliminar ${checkedIds.size} locaciones seleccionadas? Esta acción no se puede deshacer.`)) return;
+    setDeleting(true);
+    try {
+      await Promise.all([...checkedIds].map((id) => deleteDocById("locations", id)));
+      notify({ title: "Locaciones eliminadas", body: `${checkedIds.size} locaciones eliminadas correctamente.`, kind: "info" });
+      setCheckedIds(new Set());
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  const allChecked = filtered.length > 0 && filtered.every((l) => checkedIds.has(l.id));
+  const someChecked = !allChecked && filtered.some((l) => checkedIds.has(l.id));
 
   const filtered = useMemo(() => {
     const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -359,11 +391,29 @@ export function LocationsView() {
         </div>
       </div>
 
+      {/* Bulk action bar */}
+      {checkedIds.size > 0 && (
+        <div className="flex items-center gap-3 px-5 py-2.5 bg-[var(--color-surface-2)] border-b border-[var(--color-line)] shrink-0">
+          <span className="text-[13px] font-medium text-[var(--color-ink)]">{checkedIds.size} seleccionadas</span>
+          <Button variant="danger" size="sm" onClick={handleBulkDelete} disabled={deleting}>
+            {deleting ? "Eliminando…" : "Eliminar seleccionadas"}
+          </Button>
+          <button className="ml-auto text-[12px] text-[var(--color-ink-4)] hover:text-[var(--color-ink-2)]"
+            onClick={() => setCheckedIds(new Set())}>
+            Cancelar selección
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="flex-1 overflow-auto">
         <table className="w-full min-w-[750px] border-collapse text-[13px]">
           <thead className="sticky top-0 z-10">
             <tr className="border-b border-[var(--color-line)] bg-[var(--color-surface-2)]">
+              <th className="px-4 py-2.5 w-10">
+                <input type="checkbox" checked={allChecked} ref={(el) => { if (el) el.indeterminate = someChecked; }}
+                  onChange={toggleAll} className="cursor-pointer accent-[var(--color-mint-500)]" />
+              </th>
               {([
                 ["Locación",   "code"],
                 ["Categoría",  "catLabel"],
@@ -395,7 +445,13 @@ export function LocationsView() {
               const statusCfg = STATUS_LABELS[l.status] ?? STATUS_LABELS.open;
               return (
                 <tr key={l.id} onClick={() => setSelected(l)}
-                  className="border-b border-[var(--color-line)] hover:bg-[var(--color-mint-50)] cursor-pointer transition-colors group">
+                  className={cn("border-b border-[var(--color-line)] hover:bg-[var(--color-mint-50)] cursor-pointer transition-colors group",
+                    checkedIds.has(l.id) && "bg-[var(--color-mint-50)]"
+                  )}>
+                  <td className="px-4 py-3 w-10" onClick={(e) => toggleCheck(l.id, e)}>
+                    <input type="checkbox" checked={checkedIds.has(l.id)} onChange={() => {}}
+                      className="cursor-pointer accent-[var(--color-mint-500)]" />
+                  </td>
                   <td className="px-4 py-3 font-medium text-[var(--color-ink)]">
                     {l.ubicacion ?? l.ciudad}
                     <div className="text-[11px] text-[var(--color-ink-4)] font-mono">{l.code}</div>
@@ -422,7 +478,7 @@ export function LocationsView() {
               );
             })}
             {filtered.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-16 text-center text-[var(--color-ink-4)] text-[13px]">Sin locaciones para este filtro.</td></tr>
+              <tr><td colSpan={9} className="px-4 py-16 text-center text-[var(--color-ink-4)] text-[13px]">Sin locaciones para este filtro.</td></tr>
             )}
           </tbody>
         </table>
