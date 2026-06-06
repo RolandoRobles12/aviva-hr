@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { createDoc, updateDocById } from "@/hooks/useFirestore";
 import { useLocations } from "@/hooks/useLocations";
+import { useCatalog } from "@/context/CatalogContext";
 import { writeAuditEntry } from "@/services/audit";
 
 const ESTADOS_MX = [
@@ -34,18 +35,10 @@ function normalizeEstado(raw: string): string {
   return ESTADOS_MX.find((e) => norm(e) === n) ?? raw;
 }
 
-// ── CAT_MAP (must match LocationsView) ────────────────────────────────────────
-const CAT_MAP: Record<string, { label: string; short: string; color: string; bg: string }> = {
-  "Aviva tu Compra":      { label: "Aviva tu Compra",      short: "AtC", color: "#1b3f8a", bg: "#e3eeff" },
-  "Aviva tu Negocio":     { label: "Aviva tu Negocio",     short: "AtN", color: "#026149", bg: "#e7f8ef" },
-  "Casa Marchand":        { label: "Casa Marchand",        short: "CM",  color: "#5c2e8e", bg: "#ece2f5" },
-  "Aviva tu Compra · BA": { label: "Aviva tu Compra · BA", short: "BA",  color: "#8a5a00", bg: "#fff3d6" },
-  "Corporativo":          { label: "Corporativo",          short: "Corp",color: "#3a3a3a", bg: "#f1f1ee" },
-};
-const DEFAULT_CAT = { label: "Quiósco", short: "Q", color: "#1b3f8a", bg: "#e3eeff" };
+const DEFAULT_CAT = { label: "Sin producto", short: "?", color: "#6b716b", bg: "#f1f1ee" };
 
-function getCatFields(producto: string, categoria: string) {
-  return CAT_MAP[producto] ?? CAT_MAP[categoria] ?? DEFAULT_CAT;
+function initials(name: string) {
+  return name.split(/\s+/).map((w) => w[0] ?? "").join("").slice(0, 3).toUpperCase();
 }
 
 function mapStatus(raw: string): "open" | "closed" {
@@ -113,6 +106,7 @@ interface Props {
 
 export function LocationImportWizard({ onClose, onImported }: Props) {
   const { data: existingLocations } = useLocations();
+  const { products } = useCatalog();
   const [step, setStep]             = useState(0);
   const [file, setFile]             = useState<File | null>(null);
   const [parsedRows, setParsedRows] = useState<string[][]>([]);
@@ -193,7 +187,11 @@ export function LocationImportWizard({ onClose, onImported }: Props) {
         toImport.map((row) => {
           const producto  = row.mapped.producto  ?? "";
           const categoria = row.mapped.categoria ?? "";
-          const cat       = getCatFields(producto, categoria);
+          const prodName  = producto || categoria;
+          const prod      = products.find((p) => norm(p.name) === norm(prodName));
+          const cat       = prod
+            ? { label: prod.name, short: initials(prod.name), color: prod.color, bg: prod.bg }
+            : DEFAULT_CAT;
           const payload = {
             code:          row.mapped.code          ?? "",
             ciudad:        row.mapped.ciudad        ?? "",
