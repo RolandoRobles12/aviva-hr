@@ -19,6 +19,15 @@ const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }
 
 const DEFAULT_CAT = { label: "Sin producto", short: "?", color: "#6b716b", bg: "#f1f1ee" };
 
+const ESTADOS_MX = [
+  "Aguascalientes","Baja California","Baja California Sur","Campeche",
+  "Chiapas","Chihuahua","Ciudad de México","Coahuila","Colima",
+  "Durango","Estado de México","Guanajuato","Guerrero","Hidalgo",
+  "Jalisco","Michoacán","Morelos","Nayarit","Nuevo León","Oaxaca",
+  "Puebla","Querétaro","Quintana Roo","San Luis Potosí","Sinaloa",
+  "Sonora","Tabasco","Tamaulipas","Tlaxcala","Veracruz","Yucatán","Zacatecas",
+];
+
 function initials(name: string) {
   return name.split(/\s+/).map((w) => w[0] ?? "").join("").slice(0, 3).toUpperCase();
 }
@@ -31,7 +40,7 @@ function LocationModal({
   loc: (Location & { id: string }) | "new";
   onClose: () => void;
 }) {
-  const { estados, regions, products } = useCatalog();
+  const { regions, products } = useCatalog();
   const { notify } = useNotif();
   const { data: allUsers } = useUsers();
   const isNew = loc === "new";
@@ -111,7 +120,7 @@ function LocationModal({
               <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Estado de la república *</label>
               <select className={inputClass} required value={estado} onChange={(e) => setEstado(e.target.value)}>
                 <option value="">Seleccionar…</option>
-                {estados.map((est) => <option key={est} value={est}>{est}</option>)}
+                {ESTADOS_MX.map((est) => <option key={est} value={est}>{est}</option>)}
               </select>
             </div>
             <div>
@@ -264,7 +273,7 @@ function LocationDetail({
 type SortCol = "code" | "catLabel" | "ciudad" | "estado" | "gerente" | "fechaApertura" | "status";
 
 export function LocationsView() {
-  const { estados, products } = useCatalog();
+  const { products } = useCatalog();
   const { notify } = useNotif();
   const { data: locations, loading, error } = useLocations();
   const [query,      setQuery]      = useState("");
@@ -364,7 +373,7 @@ export function LocationsView() {
         <select value={estadoF} onChange={(e) => setEstadoF(e.target.value)}
           className="h-8 px-2 text-[12.5px] rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-2)] outline-none">
           <option value="all">Todos los estados</option>
-          {estados.map((e) => <option key={e} value={e}>{e}</option>)}
+          {ESTADOS_MX.map((e) => <option key={e} value={e}>{e}</option>)}
         </select>
         <select value={statusF} onChange={(e) => setStatusF(e.target.value)}
           className="h-8 px-2 text-[12.5px] rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-2)] outline-none">
