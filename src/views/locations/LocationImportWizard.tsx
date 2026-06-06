@@ -8,18 +8,29 @@ import { writeAuditEntry } from "@/services/audit";
 
 const ESTADOS_MX = [
   "Aguascalientes", "Baja California", "Baja California Sur", "Campeche",
-  "Chiapas", "Chihuahua", "Ciudad de México", "CDMX", "Coahuila", "Colima",
-  "Durango", "Guanajuato", "Guerrero", "Hidalgo", "Jalisco", "México",
-  "Michoacán", "Morelos", "Nayarit", "Nuevo León", "Oaxaca", "Puebla",
-  "Querétaro", "Quintana Roo", "San Luis Potosí", "Sinaloa", "Sonora",
-  "Tabasco", "Tamaulipas", "Tlaxcala", "Veracruz", "Yucatán", "Zacatecas",
+  "Chiapas", "Chihuahua", "Ciudad de México", "Coahuila", "Colima",
+  "Durango", "Estado de México", "Guanajuato", "Guerrero", "Hidalgo",
+  "Jalisco", "Michoacán", "Morelos", "Nayarit", "Nuevo León", "Oaxaca",
+  "Puebla", "Querétaro", "Quintana Roo", "San Luis Potosí", "Sinaloa",
+  "Sonora", "Tabasco", "Tamaulipas", "Tlaxcala", "Veracruz", "Yucatán",
+  "Zacatecas",
 ];
+
+const ESTADO_ALIASES: Record<string, string> = {
+  "mexico":           "Estado de México",
+  "estado de mexico": "Estado de México",
+  "edomex":           "Estado de México",
+  "cdmx":             "Ciudad de México",
+  "df":               "Ciudad de México",
+  "distrito federal": "Ciudad de México",
+};
 
 const norm = (s: string) =>
   s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 
 function normalizeEstado(raw: string): string {
   const n = norm(raw);
+  if (ESTADO_ALIASES[n]) return ESTADO_ALIASES[n];
   return ESTADOS_MX.find((e) => norm(e) === n) ?? raw;
 }
 
