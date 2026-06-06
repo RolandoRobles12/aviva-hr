@@ -58,7 +58,7 @@ function LocationModal({
         code, ciudad, estado, direccion, gerente, region,
         fechaApertura, status, producto, ubicacion,
         categoria: producto,
-        catLabel: prod?.name    ?? producto || DEFAULT_CAT.label,
+        catLabel: prod?.name    ?? (producto || DEFAULT_CAT.label),
         catShort: prod ? initials(prod.name) : DEFAULT_CAT.short,
         catColor: prod?.color   ?? DEFAULT_CAT.color,
         catBg:    prod?.bg      ?? DEFAULT_CAT.bg,
