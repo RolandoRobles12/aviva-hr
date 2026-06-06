@@ -317,9 +317,6 @@ export function LocationsView() {
     }
   }
 
-  const allChecked = filtered.length > 0 && filtered.every((l) => checkedIds.has(l.id));
-  const someChecked = !allChecked && filtered.some((l) => checkedIds.has(l.id));
-
   const filtered = useMemo(() => {
     const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
     const base = locations.filter((l) => {
@@ -350,6 +347,9 @@ export function LocationsView() {
       return sortDir === "asc" ? cmp : -cmp;
     });
   }, [locations, query, estadoF, statusF, productoF, sortCol, sortDir]);
+
+  const allChecked  = filtered.length > 0 && filtered.every((l) => checkedIds.has(l.id));
+  const someChecked = !allChecked && filtered.some((l) => checkedIds.has(l.id));
 
   if (loading) return <LoadingView />;
   if (error)   return <ErrorView message={error.message} />;
