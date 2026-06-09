@@ -305,8 +305,12 @@ export function LocationsView() {
   }
 
   function toggleAll(e: React.ChangeEvent<HTMLInputElement>) {
-    if (e.target.checked) setCheckedIds(new Set(filtered.map((l) => l.id)));
+    if (e.target.checked) setCheckedIds(new Set(paginated.map((l) => l.id)));
     else setCheckedIds(new Set());
+  }
+
+  function selectAll() {
+    setCheckedIds(new Set(filtered.map((l) => l.id)));
   }
 
   async function handleBulkDelete() {
@@ -356,8 +360,8 @@ export function LocationsView() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated  = filtered.slice((page - 1) * pageSize, page * pageSize);
 
-  const allChecked  = filtered.length > 0 && filtered.every((l) => checkedIds.has(l.id));
-  const someChecked = !allChecked && filtered.some((l) => checkedIds.has(l.id));
+  const allPageChecked  = paginated.length > 0 && paginated.every((l) => checkedIds.has(l.id));
+  const somePageChecked = !allPageChecked && paginated.some((l) => checkedIds.has(l.id));
 
   if (loading) return <LoadingView />;
   if (error)   return <ErrorView message={error.message} />;
@@ -416,6 +420,12 @@ export function LocationsView() {
       {checkedIds.size > 0 && (
         <div className="flex items-center gap-3 px-5 py-2.5 bg-[var(--color-surface-2)] border-b border-[var(--color-line)] shrink-0">
           <span className="text-[13px] font-medium text-[var(--color-ink)]">{checkedIds.size} seleccionadas</span>
+          {checkedIds.size < filtered.length && (
+            <button onClick={selectAll}
+              className="text-[12px] text-green-700 font-medium hover:underline">
+              Seleccionar todas ({filtered.length})
+            </button>
+          )}
           <Button variant="danger" size="sm" onClick={handleBulkDelete} disabled={deleting}>
             {deleting ? "Eliminando…" : "Eliminar seleccionadas"}
           </Button>
@@ -432,7 +442,7 @@ export function LocationsView() {
           <thead className="sticky top-0 z-10">
             <tr className="border-b border-[var(--color-line)] bg-[var(--color-surface-2)]">
               <th className="px-4 py-2.5 w-10">
-                <input type="checkbox" checked={allChecked} ref={(el) => { if (el) el.indeterminate = someChecked; }}
+                <input type="checkbox" checked={allPageChecked} ref={(el) => { if (el) el.indeterminate = somePageChecked; }}
                   onChange={toggleAll} className="cursor-pointer accent-[var(--color-mint-500)]" />
               </th>
               {([
