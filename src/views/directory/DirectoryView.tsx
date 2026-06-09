@@ -203,7 +203,7 @@ const STATUS_LABELS: Record<StatusTab, string> = {
 
 // ── KPI strip ─────────────────────────────────────────────────────────────────
 function KPIs({ users }: { users: (User & { id: string })[] }) {
-  const active      = users.filter((u) => u.status === "active").length;
+  const active      = users.filter((u) => u.status === "active" || u.status === "invited").length;
   const offboarding = users.filter((u) => u.status === "offboarding").length;
   const suspended   = users.filter((u) => u.status === "suspended").length;
 
@@ -645,7 +645,8 @@ export function DirectoryView() {
   const filtered = useMemo(() => {
     setPage(1);
     let arr = users.filter((u) => {
-      if (tab !== "all" && u.status !== tab) return false;
+      const effectiveStatus = u.status === "invited" ? "active" : u.status;
+      if (tab !== "all" && effectiveStatus !== tab) return false;
       if (regionF !== "all" && u.region !== regionF) return false;
       if (estadoF !== "all" && u.estado !== estadoF) return false;
       if (query.trim()) {

@@ -18,7 +18,8 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
-  const config = STATUS_CONFIG[status] ?? STATUS_CONFIG.active;
+  const resolved = status === "invited" ? "active" : status;
+  const config = STATUS_CONFIG[resolved] ?? STATUS_CONFIG.active;
   return (
     <span
       className={cn(
