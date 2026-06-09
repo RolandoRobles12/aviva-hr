@@ -2,7 +2,7 @@ import { useState, useMemo, useRef } from "react";
 import { Check, Close, Download, Upload, Warn } from "@/components/icons";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
-import { createDoc, updateDocById } from "@/hooks/useFirestore";
+import { createDoc, updateDocById, useCollection } from "@/hooks/useFirestore";
 import { useUsers } from "@/hooks/useUsers";
 import { useLocations } from "@/hooks/useLocations";
 import { writeAuditEntry } from "@/services/audit";
@@ -97,6 +97,7 @@ interface Props {
 export function ImportWizard({ onClose, onImported }: Props) {
   const { data: existingUsers } = useUsers();
   const { data: locations } = useLocations();
+  const { data: positions } = useCollection<{ name: string }>("catalog/positions/items");
 
   function resolveQuiosco(raw: string): string {
     if (!raw) return "";
@@ -148,6 +149,20 @@ export function ImportWizard({ onClose, onImported }: Props) {
     // Fall back to first city match or raw value
     return candidates[0]?.ubicacion ?? candidates[0]?.ciudad ?? raw;
   }
+
+  function resolveRole(raw: string): string {
+    if (!raw) return raw;
+    const n = (s: string) =>
+      s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\/a\b/g, "").trim();
+    const nraw = n(raw);
+    // Exact normalized match
+    const exact = positions.find((p) => n(p.name) === nraw);
+    if (exact) return exact.name;
+    // Partial match: catalog name starts with or contains the CSV value
+    const partial = positions.find((p) => n(p.name).includes(nraw) || nraw.includes(n(p.name)));
+    return partial ? partial.name : raw;
+  }
+
   const [step, setStep]               = useState(0);
   const [file, setFile]               = useState<File | null>(null);
   const [parsedRows, setParsedRows]   = useState<string[][]>([]);
@@ -234,7 +249,7 @@ export function ImportWizard({ onClose, onImported }: Props) {
             first:          parts[0] ?? "",
             last:           parts.slice(1).join(" "),
             email:          row.mapped.email        ?? "",
-            role:           row.mapped.role         ?? "",
+            role:           resolveRole(row.mapped.role ?? ""),
             empresa:        row.mapped.empresa      ?? "",
             quiosco:        resolveQuiosco(row.mapped.quiosco ?? ""),
             estado:         row.mapped.estado       ?? "",
