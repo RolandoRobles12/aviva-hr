@@ -39,6 +39,7 @@ export function useCollection<T extends DocumentData>(
     const unsub = onSnapshot(
       q,
       (snap) => {
+        console.log(`[useCollection] ${path}: ${snap.docs.length} docs`);
         setData(snap.docs.map((d) => ({ id: d.id, ...(d.data() as T) })));
         setLoading(false);
         setError(null);
