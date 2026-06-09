@@ -13,7 +13,7 @@ const CLOUD_URL = "https://aviva-api-101284022421.us-central1.run.app";
 
 const NAV: { id: Section; label: string; sub: string }[] = [
   { id: "auth",      label: "Autenticación",      sub: "API Keys · Scopes · Errores" },
-  { id: "endpoints", label: "Referencia REST",     sub: "12 endpoints documentados" },
+  { id: "endpoints", label: "Referencia REST",     sub: "16 endpoints documentados" },
   { id: "webhooks",  label: "Guía de Webhooks",   sub: "Firma HMAC · Reintentos" },
   { id: "examples",  label: "Ejemplos de código",  sub: "cURL · Node.js · Python" },
   { id: "consola",   label: "Consola",             sub: "Prueba el API en vivo" },
@@ -159,14 +159,17 @@ function SectionAuth() {
         </thead>
         <tbody>
           {[
-            ["users:read",        "Leer el directorio de colaboradores (GET /users, GET /users/:id)."],
-            ["users:write",       "Crear y editar colaboradores (POST /users, PATCH /users/:id)."],
-            ["users:delete",      "Iniciar tickets de baja (POST /users/:id/offboard)."],
-            ["tickets:read",      "Consultar el estado de tickets de onboarding y offboarding."],
-            ["tickets:write",     "Aprobar etapas de un ticket (POST /tickets/:id/approve)."],
-            ["audit:read",        "Leer el log inmutable de auditoría (GET /audit)."],
-            ["events:write",      "Publicar eventos hacia webhooks externos."],
-            ["integrations:read", "Consultar el estado de apps conectadas (GET /integrations)."],
+            ["users:read",           "Leer el directorio de colaboradores (GET /users, GET /users/:id)."],
+            ["users:write",          "Crear y editar colaboradores (POST /users, PATCH /users/:id)."],
+            ["users:delete",         "Iniciar tickets de baja (POST /users/:id/offboard)."],
+            ["locations:read",       "Consultar locaciones (GET /locations, GET /locations/:id)."],
+            ["locations:write",      "Crear y editar locaciones (POST /locations, PATCH /locations/:id)."],
+            ["locations:delete",     "Eliminar locaciones (DELETE /locations/:id)."],
+            ["tickets:read",         "Consultar el estado de tickets de onboarding y offboarding."],
+            ["tickets:write",        "Aprobar etapas de un ticket (POST /tickets/:id/approve)."],
+            ["audit:read",           "Leer el log inmutable de auditoría (GET /audit)."],
+            ["events:write",         "Publicar eventos hacia webhooks externos."],
+            ["integrations:read",    "Consultar el estado de apps conectadas (GET /integrations)."],
           ].map(([scope, desc]) => (
             <tr key={scope} className="border-b border-dashed border-[var(--color-line)] last:border-0">
               <td className="py-2 pr-4 align-top"><IC>{scope}</IC></td>
@@ -448,7 +451,7 @@ const ENDPOINTS = [
 }`,
   },
   {
-    method: "GET", path: "/locations", scope: "users:read",
+    method: "GET", path: "/locations", scope: "locations:read",
     desc: "Lista paginada de locaciones (quioscos, tiendas, corporativos). Soporta filtros por estado, estatus y producto.",
     params: [
       { name: "estado",   type: "string",  desc: "Estado de la república. Ej: Hidalgo" },
@@ -479,6 +482,76 @@ const ENDPOINTS = [
     }
   ],
   "meta": { "page": 1, "limit": 50, "total": 34 }
+}`,
+  },
+  {
+    method: "GET", path: "/locations/:id", scope: "locations:read",
+    desc: "Detalle completo de una locación.",
+    params: [
+      { name: "id", type: "string", req: true, desc: "ID de la locación. Ej: loc-tulancingo-01" },
+    ],
+    response: `{
+  "id": "loc-tulancingo-01",
+  "code": "HGO-001",
+  "ciudad": "Tulancingo",
+  "estado": "Hidalgo",
+  "ubicacion": "Plaza Central Tulancingo",
+  "producto": "Aviva tu Compra",
+  "catLabel": "Aviva tu Compra",
+  "catShort": "AtC",
+  "catColor": "#1b3f8a",
+  "catBg": "#e3eeff",
+  "gerente": "Adrián Contreras Zapata",
+  "hub": "Hub Hidalgo",
+  "status": "open",
+  "fechaApertura": "2024-03-15"
+}`,
+  },
+  {
+    method: "POST", path: "/locations", scope: "locations:write",
+    desc: "Crea una nueva locación en el directorio.",
+    body: [
+      { name: "code",         type: "string", req: true,  desc: "Código único de la locación. Ej: HGO-002" },
+      { name: "ciudad",       type: "string", req: true,  desc: "Ciudad donde se ubica." },
+      { name: "estado",       type: "string", req: true,  desc: "Estado de la república." },
+      { name: "ubicacion",    type: "string", req: false, desc: "Nombre del centro comercial o dirección." },
+      { name: "producto",     type: "string", req: true,  desc: "Línea de producto. Ej: Aviva tu Compra" },
+      { name: "hub",          type: "string", req: true,  desc: "ID del hub al que pertenece." },
+      { name: "gerente",      type: "string", req: false, desc: "Nombre del gerente de la locación." },
+      { name: "fechaApertura",type: "date",   req: false, desc: "Fecha de apertura. Formato YYYY-MM-DD." },
+    ],
+    response: `{
+  "id": "loc-tulancingo-02",
+  "code": "HGO-002",
+  "status": "open",
+  "created_at": "2026-06-09T10:00:00Z"
+}`,
+  },
+  {
+    method: "PATCH", path: "/locations/:id", scope: "locations:write",
+    desc: "Edita campos parciales de una locación. Solo los campos enviados se modifican.",
+    body: [
+      { name: "gerente",   type: "string", desc: "Nuevo gerente." },
+      { name: "ubicacion", type: "string", desc: "Nueva dirección o nombre del centro comercial." },
+      { name: "status",    type: "string", desc: "open | closed" },
+      { name: "hub",       type: "string", desc: "ID del nuevo hub." },
+    ],
+    response: `{
+  "id": "loc-tulancingo-01",
+  "updated_fields": ["gerente", "status"],
+  "audit_id": "audit-20260609-loc1"
+}`,
+  },
+  {
+    method: "DELETE", path: "/locations/:id", scope: "locations:delete",
+    desc: "Elimina permanentemente una locación. Esta acción no se puede deshacer y queda registrada en auditoría.",
+    params: [
+      { name: "id", type: "string", req: true, desc: "ID de la locación a eliminar." },
+    ],
+    response: `{
+  "id": "loc-tulancingo-01",
+  "deleted": true,
+  "audit_id": "audit-20260609-loc2"
 }`,
   },
 ];
