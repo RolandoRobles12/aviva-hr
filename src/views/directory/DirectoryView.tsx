@@ -550,8 +550,8 @@ function UserCard({ user, selected, onToggle, onClick, regionLabel }: {
 }
 
 // ── Bulk action bar ───────────────────────────────────────────────────────────
-function BulkBar({ count, total, onSelectAll, onClear, onOffboard }: {
-  count: number; total: number; onSelectAll: () => void; onClear: () => void; onOffboard: () => void;
+function BulkBar({ count, total, onSelectAll, onClear, onOffboard, onDelete }: {
+  count: number; total: number; onSelectAll: () => void; onClear: () => void; onOffboard: () => void; onDelete: () => void;
 }) {
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 px-5 py-3 rounded-full bg-[var(--color-ink)] text-white shadow-[var(--shadow-lg)]">
@@ -566,6 +566,8 @@ function BulkBar({ count, total, onSelectAll, onClear, onOffboard }: {
       )}
       <div className="w-px h-4 bg-white/20" />
       <button onClick={onOffboard} className="text-[12.5px] text-red-400 hover:text-red-300 transition-colors">Iniciar baja</button>
+      <div className="w-px h-4 bg-white/20" />
+      <button onClick={onDelete} className="text-[12.5px] text-red-400 hover:text-red-300 transition-colors">Eliminar</button>
       <div className="w-px h-4 bg-white/20" />
       <button onClick={onClear} className="text-[12px] text-white/60 hover:text-white transition-colors">Cancelar</button>
     </div>
@@ -608,6 +610,14 @@ export function DirectoryView() {
   function handleOffboard() {
     notify({ title: "Iniciar baja", body: `${selected.size} colaborador${selected.size > 1 ? "es" : ""} marcado${selected.size > 1 ? "s" : ""} para baja. Abre un ticket para continuar.`, kind: "offboard" });
     navigate("/tickets");
+  }
+
+  async function handleBulkDelete() {
+    const count = selected.size;
+    if (!window.confirm(`¿Eliminar ${count} colaborador${count > 1 ? "es" : ""}? Esta acción no se puede deshacer.`)) return;
+    await Promise.all([...selected].map((id) => deleteDocById("users", id)));
+    notify({ title: "Colaboradores eliminados", body: `${count} colaborador${count > 1 ? "es eliminados" : " eliminado"} correctamente.`, kind: "info" });
+    setSelected(new Set());
   }
 
   const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -854,7 +864,7 @@ export function DirectoryView() {
 
       {/* Bulk bar */}
       {selected.size > 0 && (
-        <BulkBar count={selected.size} total={filtered.length} onSelectAll={selectAll} onClear={() => setSelected(new Set())} onOffboard={handleOffboard} />
+        <BulkBar count={selected.size} total={filtered.length} onSelectAll={selectAll} onClear={() => setSelected(new Set())} onOffboard={handleOffboard} onDelete={handleBulkDelete} />
       )}
 
       {/* Import wizard */}
