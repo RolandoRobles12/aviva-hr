@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { cn } from "@/lib/cn";
 
 interface Option {
@@ -17,32 +17,39 @@ interface Props {
 }
 
 export function SearchableSelect({ value, onChange, options, placeholder = "Buscar…", emptyLabel = "Sin asignar", className }: Props) {
-  const [open, setOpen]       = useState(false);
-  const [query, setQuery]     = useState("");
-  const containerRef          = useRef<HTMLDivElement>(null);
-  const inputRef              = useRef<HTMLInputElement>(null);
+  const [open, setOpen]   = useState(false);
+  const [query, setQuery] = useState("");
+  const containerRef      = useRef<HTMLDivElement>(null);
+  const inputRef          = useRef<HTMLInputElement>(null);
 
   const selected = options.find((o) => o.value === value);
 
-  const filtered = query.trim()
-    ? options.filter((o) =>
-        o.label.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").includes(
-          query.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
-        ) ||
-        (o.sub ?? "").toLowerCase().includes(query.toLowerCase())
-      )
-    : options;
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+    if (!q) return options;
+    return options.filter((o) => {
+      const label = o.label.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+      const sub   = (o.sub ?? "").toLowerCase();
+      return label.includes(q) || sub.includes(q);
+    });
+  }, [options, query]);
 
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
+    function handleOutsideClick(e: MouseEvent) {
       if (!containerRef.current?.contains(e.target as Node)) {
         setOpen(false);
         setQuery("");
       }
     }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    // Use click (not mousedown) so internal interactions complete before close check
+    document.addEventListener("click", handleOutsideClick, { capture: true });
+    return () => document.removeEventListener("click", handleOutsideClick, { capture: true });
   }, []);
+
+  function openDropdown() {
+    setOpen(true);
+    setTimeout(() => inputRef.current?.focus(), 30);
+  }
 
   function select(val: string) {
     onChange(val);
@@ -54,7 +61,7 @@ export function SearchableSelect({ value, onChange, options, placeholder = "Busc
     <div ref={containerRef} className={cn("relative", className)}>
       <button
         type="button"
-        onClick={() => { setOpen((o) => !o); setTimeout(() => inputRef.current?.focus(), 50); }}
+        onClick={() => (open ? setOpen(false) : openDropdown())}
         className="h-9 w-full px-3 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)] text-[13px] outline-none flex items-center justify-between gap-2 text-left"
       >
         <span className={cn("truncate", !selected && "text-[var(--color-ink-4)]")}>
@@ -71,13 +78,18 @@ export function SearchableSelect({ value, onChange, options, placeholder = "Busc
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-full min-w-[220px] rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] shadow-[var(--shadow-lg)] overflow-hidden">
+        <div
+          className="absolute z-50 mt-1 w-full min-w-[220px] rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] shadow-[var(--shadow-lg)] overflow-hidden"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="p-2 border-b border-[var(--color-line)]">
             <input
               ref={inputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={placeholder}
+              autoComplete="off"
               className="w-full h-7 px-2 text-[12.5px] rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface-2)] text-[var(--color-ink)] outline-none placeholder:text-[var(--color-ink-4)]"
             />
           </div>
