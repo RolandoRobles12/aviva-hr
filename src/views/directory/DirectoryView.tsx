@@ -541,10 +541,20 @@ function UserCard({ user, selected, onToggle, onClick, regionLabel }: {
 }
 
 // ── Bulk action bar ───────────────────────────────────────────────────────────
-function BulkBar({ count, onClear, onOffboard }: { count: number; onClear: () => void; onOffboard: () => void }) {
+function BulkBar({ count, total, onSelectAll, onClear, onOffboard }: {
+  count: number; total: number; onSelectAll: () => void; onClear: () => void; onOffboard: () => void;
+}) {
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 px-5 py-3 rounded-full bg-[var(--color-ink)] text-white shadow-[var(--shadow-lg)]">
       <span className="font-bold text-[13px]">{count} seleccionado{count > 1 ? "s" : ""}</span>
+      {count < total && (
+        <>
+          <div className="w-px h-4 bg-white/20" />
+          <button onClick={onSelectAll} className="text-[12.5px] text-white/80 hover:text-white transition-colors">
+            Seleccionar todos ({total})
+          </button>
+        </>
+      )}
       <div className="w-px h-4 bg-white/20" />
       <button onClick={onOffboard} className="text-[12.5px] text-[var(--color-danger-fg)] hover:opacity-80 transition-opacity">Iniciar baja</button>
       <div className="w-px h-4 bg-white/20" />
@@ -570,7 +580,8 @@ export function DirectoryView() {
   const [importing, setImporting] = useState(false);
   const [newUserOpen, setNewUserOpen] = useState(false);
   const [page,     setPage]     = useState(1);
-  const PAGE_SIZE = 50;
+  const [pageSize, setPageSize] = useState(50);
+  const [sortDir,  setSortDir]  = useState<"asc" | "desc">("asc");
 
   function exportCSV() {
     const headers = ["Número","Nombre completo","Email","Puesto","Región","Quiósco","Estado","Empresa","Estatus","Antigüedad (meses)"];
@@ -610,15 +621,16 @@ export function DirectoryView() {
       }
       return true;
     });
-    if (sortBy === "name")    arr = [...arr].sort((a, b) => a.fullName.localeCompare(b.fullName));
-    if (sortBy === "region")  arr = [...arr].sort((a, b) => (a.region || "").localeCompare(b.region || ""));
-    if (sortBy === "quiosco") arr = [...arr].sort((a, b) => (a.quiosco || "").localeCompare(b.quiosco || ""));
-    if (sortBy === "recent")  arr = [...arr].sort((a, b) => (b.hiredAt ?? "").localeCompare(a.hiredAt ?? ""));
+    const dir = sortDir === "asc" ? 1 : -1;
+    if (sortBy === "name")    arr = [...arr].sort((a, b) => dir * a.fullName.localeCompare(b.fullName));
+    if (sortBy === "region")  arr = [...arr].sort((a, b) => dir * (a.region || "").localeCompare(b.region || ""));
+    if (sortBy === "quiosco") arr = [...arr].sort((a, b) => dir * (a.quiosco || "").localeCompare(b.quiosco || ""));
+    if (sortBy === "recent")  arr = [...arr].sort((a, b) => dir * (b.hiredAt ?? "").localeCompare(a.hiredAt ?? ""));
     return arr;
-  }, [users, tab, query, regionF, estadoF, sortBy]);
+  }, [users, tab, query, regionF, estadoF, sortBy, sortDir]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginated  = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   const counts = useMemo(() => {
     const m: Record<string, number> = { all: users.length };
@@ -636,8 +648,18 @@ export function DirectoryView() {
   }
 
   function toggleAll() {
-    if (selected.size === filtered.length) setSelected(new Set());
-    else setSelected(new Set(filtered.map((u) => u.id)));
+    const pageIds = new Set(paginated.map((u) => u.id));
+    const allPageSelected = paginated.every((u) => selected.has(u.id));
+    setSelected((prev) => {
+      const n = new Set(prev);
+      if (allPageSelected) pageIds.forEach((id) => n.delete(id));
+      else pageIds.forEach((id) => n.add(id));
+      return n;
+    });
+  }
+
+  function selectAll() {
+    setSelected(new Set(filtered.map((u) => u.id)));
   }
 
   if (loading) return <LoadingView />;
@@ -705,30 +727,32 @@ export function DirectoryView() {
             ))}
           </select>
           <div className="flex items-center gap-1 ml-auto">
-            <ArrowUpDown size={13} className="text-[var(--color-ink-4)]" />
             <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}
               className="h-8 px-2 text-[12.5px] rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-2)] outline-none">
-              <option value="name">Nombre A–Z</option>
+              <option value="name">Nombre</option>
               <option value="region">Región</option>
               <option value="quiosco">Quiósco</option>
-              <option value="recent">Más recientes</option>
+              <option value="recent">Ingreso</option>
             </select>
+            <button onClick={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
+              title={sortDir === "asc" ? "Ascendente" : "Descendente"}
+              className="h-8 px-2 rounded border border-[var(--color-line)] hover:bg-[var(--color-surface-2)] text-[var(--color-ink-3)] transition-colors">
+              <ArrowUpDown size={13} className={sortDir === "desc" ? "rotate-180 transition-transform" : "transition-transform"} />
+            </button>
             <span className="text-[12px] text-[var(--color-ink-4)] ml-2">{filtered.length} resultados</span>
-            {totalPages > 1 && (
-              <div className="flex items-center gap-1 ml-3">
-                <button
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="px-2 h-7 rounded text-[12px] border border-[var(--color-line)] disabled:opacity-30 hover:bg-[var(--color-surface-2)]"
-                >‹</button>
-                <span className="text-[12px] text-[var(--color-ink-3)] px-1">{page} / {totalPages}</span>
-                <button
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className="px-2 h-7 rounded text-[12px] border border-[var(--color-line)] disabled:opacity-30 hover:bg-[var(--color-surface-2)]"
-                >›</button>
-              </div>
-            )}
+            <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+              className="h-8 px-2 text-[12.5px] rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-2)] outline-none ml-1">
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <div className="flex items-center gap-1 ml-1">
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                className="px-2 h-7 rounded text-[12px] border border-[var(--color-line)] disabled:opacity-30 hover:bg-[var(--color-surface-2)]">‹</button>
+              <span className="text-[12px] text-[var(--color-ink-3)] px-1">{page} / {totalPages}</span>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                className="px-2 h-7 rounded text-[12px] border border-[var(--color-line)] disabled:opacity-30 hover:bg-[var(--color-surface-2)]">›</button>
+            </div>
           </div>
         </div>
       </div>
@@ -741,7 +765,7 @@ export function DirectoryView() {
               <tr className="border-b border-[var(--color-line)] bg-[var(--color-surface-2)]">
                 <th className="px-4 py-2.5 w-9">
                   <input type="checkbox"
-                    checked={selected.size > 0 && selected.size === filtered.length}
+                    checked={paginated.length > 0 && paginated.every((u) => selected.has(u.id))}
                     onChange={toggleAll}
                     className="cursor-pointer" />
                 </th>
@@ -821,7 +845,7 @@ export function DirectoryView() {
 
       {/* Bulk bar */}
       {selected.size > 0 && (
-        <BulkBar count={selected.size} onClear={() => setSelected(new Set())} onOffboard={handleOffboard} />
+        <BulkBar count={selected.size} total={filtered.length} onSelectAll={selectAll} onClear={() => setSelected(new Set())} onOffboard={handleOffboard} />
       )}
 
       {/* Import wizard */}
