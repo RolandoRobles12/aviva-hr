@@ -70,10 +70,9 @@ function NewUserModal({ onClose }: { onClose: () => void }) {
         },
         hiredAt: new Date().toISOString().slice(0, 10),
         hireMonths: 0,
-        status: "invited",
+        status: "active",
         laptop: null, tablets: [], access: [],
         hubspot: null, slackOpsId: null,
-        status: "active",
       });
       notify({ title: "Alta creada", body: `${first} ${last} · Invitación pendiente.`, kind: "onboard" });
       onClose();
