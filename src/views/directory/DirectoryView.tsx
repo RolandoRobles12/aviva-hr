@@ -233,8 +233,15 @@ function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; 
   const { data: locations } = useLocations();
   const quioscoLabel = (val: string | undefined) => {
     if (!val) return "";
-    const loc = locations.find((l) => l.id === val);
+    const loc = locations.find((l) => l.id === val)
+             ?? locations.find((l) => (l.ubicacion ?? l.ciudad) === val);
     return loc ? (loc.ubicacion ?? loc.ciudad) : val;
+  };
+  // Resolve legacy name-based quiosco values to IDs
+  const resolveQuioscoId = (val: string | undefined) => {
+    if (!val) return "";
+    if (locations.find((l) => l.id === val)) return val;
+    return locations.find((l) => (l.ubicacion ?? l.ciudad) === val)?.id ?? val;
   };
   const [tab, setTab] = useState<"info" | "access" | "devices">("info");
   const [editing, setEditing] = useState(false);
@@ -245,7 +252,7 @@ function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; 
   const [area,      setArea]      = useState(user.area ?? "");
   const [region,    setRegion]    = useState(user.region ?? "");
   const [estado,    setEstado]    = useState(user.estado ?? "");
-  const [quiosco,   setQuiosco]   = useState(user.quiosco ?? "");
+  const [quiosco,   setQuiosco]   = useState(resolveQuioscoId(user.quiosco));
   const [empresa,   setEmpresa]   = useState(user.empresa ?? "Aviva Crédito");
   const [managerId, setManagerId] = useState(user.manager ?? "");
   const [talla,     setTalla]     = useState(user.talla ?? "M");
@@ -602,7 +609,8 @@ export function DirectoryView() {
 
   function quioscoLabel(val: string | undefined): string {
     if (!val) return "";
-    const loc = locations.find((l) => l.id === val);
+    const loc = locations.find((l) => l.id === val)
+             ?? locations.find((l) => (l.ubicacion ?? l.ciudad) === val);
     return loc ? (loc.ubicacion ?? loc.ciudad) : val;
   }
 
