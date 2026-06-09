@@ -72,8 +72,8 @@ function NewUserModal({ onClose }: { onClose: () => void }) {
         hireMonths: 0,
         status: "invited",
         laptop: null, tablets: [], access: [],
-        hubspot: null,
-        slackOpsId: null,
+        hubspot: null, slackOpsId: null,
+        status: "active",
       });
       notify({ title: "Alta creada", body: `${first} ${last} · Invitación pendiente.`, kind: "onboard" });
       onClose();
@@ -195,25 +195,25 @@ function NewUserModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-const STATUS_TABS = ["all", "active", "invited", "offboarding", "suspended"] as const;
+const STATUS_TABS = ["all", "active", "offboarding", "suspended"] as const;
 type StatusTab = (typeof STATUS_TABS)[number];
 const STATUS_LABELS: Record<StatusTab, string> = {
-  all: "Todos", active: "Activos", invited: "Invitados",
+  all: "Todos", active: "Activos",
   offboarding: "En baja", suspended: "Suspendidos",
 };
 
 // ── KPI strip ─────────────────────────────────────────────────────────────────
 function KPIs({ users }: { users: (User & { id: string })[] }) {
   const active      = users.filter((u) => u.status === "active").length;
-  const invited     = users.filter((u) => u.status === "invited").length;
   const offboarding = users.filter((u) => u.status === "offboarding").length;
+  const suspended   = users.filter((u) => u.status === "suspended").length;
 
   return (
     <div className="grid grid-cols-4 gap-3 px-5 py-3 border-b border-[var(--color-line)] bg-[var(--color-surface)]">
       {[
         { label: "Activos",          value: active,         accent: "var(--color-green-700)" },
-        { label: "Altas en curso",   value: invited,        accent: "var(--color-green-700)" },
         { label: "Bajas en proceso", value: offboarding,    accent: "var(--color-danger-fg)" },
+        { label: "Suspendidos",      value: suspended,      accent: "var(--color-ink-3)" },
         { label: "Total",            value: users.length,   accent: "var(--color-ink)" },
       ].map((k) => (
         <div key={k.label} className="px-4 py-2.5 rounded-[var(--radius-sm)] bg-[var(--color-surface-2)] border border-[var(--color-line)]">
@@ -347,7 +347,7 @@ function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; 
                   className="w-full h-8 px-2 text-[13px] rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)] outline-none"
                 >
                   <option value="active">Activo</option>
-                  <option value="invited">Invitado</option>
+
                   <option value="suspended">Suspendido</option>
                   <option value="offboarding">En baja</option>
                   <option value="archived">Archivado</option>
@@ -693,12 +693,16 @@ export function DirectoryView() {
           <select value={regionF} onChange={(e) => setRegionF(e.target.value)}
             className="h-8 px-2 text-[12.5px] rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-2)] outline-none">
             <option value="all">Todas las regiones</option>
-            {regions.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+            {[...new Set(users.map((u) => u.region).filter(Boolean))].sort().map((r) => (
+              <option key={r} value={r}>{regionLabel(r)}</option>
+            ))}
           </select>
           <select value={estadoF} onChange={(e) => setEstadoF(e.target.value)}
             className="h-8 px-2 text-[12.5px] rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-2)] outline-none">
             <option value="all">Todos los estados</option>
-            {estados.map((e) => <option key={e} value={e}>{e}</option>)}
+            {[...new Set(users.map((u) => u.estado).filter(Boolean))].sort().map((e) => (
+              <option key={e} value={e}>{e}</option>
+            ))}
           </select>
           <div className="flex items-center gap-1 ml-auto">
             <ArrowUpDown size={13} className="text-[var(--color-ink-4)]" />

@@ -207,7 +207,7 @@ export function ImportWizard({ onClose, onImported }: Props) {
             hubspot:        row.mapped.hubspot      || null,
             slackOpsId:     row.mapped.slackOpsId   || null,
             region:         (row.mapped.region ?? "").toLowerCase().replace(/\s+/g, "_"),
-            status:         "invited",
+            status:         "active",
             access:         [],
             tablets:        [],
             laptop:         null,
