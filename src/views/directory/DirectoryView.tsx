@@ -231,6 +231,11 @@ function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; 
   const { notify } = useNotif();
   const { data: positions } = useCollection<{ name: string }>("catalog/positions/items");
   const { data: locations } = useLocations();
+  const quioscoLabel = (val: string | undefined) => {
+    if (!val) return "";
+    const loc = locations.find((l) => l.id === val);
+    return loc ? (loc.ubicacion ?? loc.ciudad) : val;
+  };
   const [tab, setTab] = useState<"info" | "access" | "devices">("info");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -288,7 +293,7 @@ function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; 
   const inputClass = "h-9 w-full px-3 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)] text-[13px] outline-none";
 
   return (
-    <Drawer open onClose={onClose} title={editing ? "Editar perfil" : user.fullName} subtitle={editing ? "" : `${user.role} · ${user.quiosco}, ${user.estado}`}>
+    <Drawer open onClose={onClose} title={editing ? "Editar perfil" : user.fullName} subtitle={editing ? "" : `${user.role} · ${quioscoLabel(user.quiosco)}, ${user.estado}`}>
       <div>
         <div className="flex items-center border-b border-[var(--color-line)] px-6">
           {!editing && (["info", "access", "devices"] as const).map((t) => (
@@ -541,7 +546,7 @@ function UserCard({ user, selected, onToggle, onClick, regionLabel }: {
           {regionLabel(user.region)}
         </span>
         <span className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--color-surface-2)] border border-[var(--color-line)] text-[var(--color-ink-3)]">
-          {user.quiosco}
+          {quioscoLabel(user.quiosco)}
         </span>
       </div>
       <div className="text-[11.5px] text-[var(--color-ink-4)] font-mono">{user.email}</div>
@@ -578,6 +583,7 @@ function BulkBar({ count, total, onSelectAll, onClear, onOffboard, onDelete }: {
 export function DirectoryView() {
   const { regions, regionLabel, estados } = useCatalog();
   const { data: users, loading, error } = useUsers();
+  const { data: locations } = useLocations();
   const { notify } = useNotif();
   const navigate = useNavigate();
   const [tab,      setTab]      = useState<StatusTab>("all");
@@ -594,11 +600,17 @@ export function DirectoryView() {
   const [pageSize, setPageSize] = useState(50);
   const [sortDir,  setSortDir]  = useState<"asc" | "desc">("asc");
 
+  function quioscoLabel(val: string | undefined): string {
+    if (!val) return "";
+    const loc = locations.find((l) => l.id === val);
+    return loc ? (loc.ubicacion ?? loc.ciudad) : val;
+  }
+
   function exportCSV() {
     const headers = ["Número","Nombre completo","Email","Puesto","Región","Quiósco","Estado","Empresa","Estatus","Antigüedad (meses)"];
     const rows = filtered.map(u => [
       u.numColaborador, u.fullName, u.email, u.role,
-      regionLabel(u.region), u.quiosco, u.estado, u.empresa, u.status, monthsSince(u.hiredAt),
+      regionLabel(u.region), quioscoLabel(u.quiosco), u.estado, u.empresa, u.status, monthsSince(u.hiredAt),
     ]);
     const csv = [headers, ...rows].map(r => r.map(c => `"${String(c??'').replace(/"/g,'""')}"`).join(",")).join("\n");
     const a = document.createElement("a");
@@ -634,7 +646,7 @@ export function DirectoryView() {
           norm(u.fullName).includes(q) ||
           norm(u.email).includes(q) ||
           norm(u.role).includes(q) ||
-          norm(u.quiosco).includes(q) ||
+          norm(quioscoLabel(u.quiosco)).includes(q) ||
           u.numColaborador.includes(q)
         );
       }
@@ -820,7 +832,7 @@ export function DirectoryView() {
                     <td className="px-4 py-3 max-w-[140px]">
                       <span className="truncate block text-[12px] text-[var(--color-ink-3)]">{regionLabel(u.region)}</span>
                     </td>
-                    <td className="px-4 py-3 text-[var(--color-ink-3)] whitespace-nowrap text-[12.5px]">{u.quiosco}</td>
+                    <td className="px-4 py-3 text-[var(--color-ink-3)] whitespace-nowrap text-[12.5px]">{quioscoLabel(u.quiosco)}</td>
                     <td className="px-4 py-3 text-[12px] text-[var(--color-ink-3)]">{u.estado}</td>
                     <td className="px-4 py-3 text-[12.5px] text-[var(--color-ink-3)]">
                       {mgr ? <span className="flex items-center gap-1.5"><Avatar user={mgr} size="sm" />{mgr.first}</span> : "—"}
