@@ -101,9 +101,20 @@ export function ImportWizard({ onClose, onImported }: Props) {
   function resolveQuiosco(raw: string): string {
     if (!raw) return "";
     const n = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+
+    // Strip known product suffixes to get the base city name
+    const SUFFIXES = [" ba", " mba", " cm", " cr", " atn", " wm", " sba", " atc"];
+    const nraw = n(raw);
+    const base = SUFFIXES.reduce((acc, sfx) => acc.endsWith(sfx) ? acc.slice(0, -sfx.length).trim() : acc, nraw);
+
     const match = locations.find((l) => {
       const display = l.ubicacion ?? l.ciudad;
-      return n(display) === n(raw) || n(l.ciudad) === n(raw) || n(l.code) === n(raw);
+      return (
+        n(display) === nraw ||
+        n(l.ciudad) === nraw ||
+        n(l.code)   === nraw ||
+        n(l.ciudad) === base
+      );
     });
     return match ? (match.ubicacion ?? match.ciudad) : raw;
   }

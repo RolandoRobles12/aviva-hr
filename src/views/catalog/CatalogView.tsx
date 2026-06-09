@@ -8,7 +8,7 @@ import { cn } from "@/lib/cn";
 
 interface Product  { id?: string; name: string; tagline: string; color: string; bg: string }
 interface Position { id?: string; name: string; level: string; area: string; productId: string | null }
-interface Region   { id?: string; label: string; area: string; leader: string }
+interface Region   { id?: string; label: string; area: string; leader: string; estados: string[]; productos: string[] }
 
 const AREAS = ["Kiosk Acquisitions", "Growth", "Sales", "Operaciones", "People & Culture", "Legal", "Finanzas", "Tecnología", "Agencia"];
 const LEVELS = ["operativo", "junior", "senior", "manager", "director", "vp", "clevel"];
@@ -152,48 +152,110 @@ function PositionModal({ pos, onClose }: { pos: (Position & { id: string }) | "n
   );
 }
 
+const ESTADOS_MX = [
+  "Aguascalientes","Baja California","Baja California Sur","Campeche",
+  "Chiapas","Chihuahua","Ciudad de México","Coahuila","Colima",
+  "Durango","Estado de México","Guanajuato","Guerrero","Hidalgo",
+  "Jalisco","Michoacán","Morelos","Nayarit","Nuevo León","Oaxaca",
+  "Puebla","Querétaro","Quintana Roo","San Luis Potosí","Sinaloa",
+  "Sonora","Tabasco","Tamaulipas","Tlaxcala","Veracruz","Yucatán","Zacatecas",
+];
+
 // ── Region Modal ───────────────────────────────────────────────────────────────
 function RegionModal({ region, onClose }: { region: (Region & { id: string }) | "new"; onClose: () => void }) {
   const isNew = region === "new";
   const existing = isNew ? null : region;
   const { data: users } = useUsers();
-  const [label,  setLabel]  = useState(existing?.label  ?? "");
-  const [area,   setArea]   = useState(existing?.area   ?? "");
-  const [leader, setLeader] = useState(existing?.leader ?? "");
-  const [saving, setSaving] = useState(false);
+  const { data: products } = useCollection<Product>("catalog/products/items");
+  const [label,    setLabel]    = useState(existing?.label    ?? "");
+  const [area,     setArea]     = useState(existing?.area     ?? "");
+  const [leader,   setLeader]   = useState(existing?.leader   ?? "");
+  const [estados,  setEstados]  = useState<string[]>(existing?.estados  ?? []);
+  const [prods,    setProds]    = useState<string[]>(existing?.productos ?? []);
+  const [saving,   setSaving]   = useState(false);
+
+  function toggleEstado(e: string) {
+    setEstados((prev) => prev.includes(e) ? prev.filter((x) => x !== e) : [...prev, e]);
+  }
+  function toggleProd(p: string) {
+    setProds((prev) => prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     try {
-      if (isNew) await createDoc("catalog/regions/items", { label, area, leader });
-      else        await updateDocById("catalog/regions/items", existing!.id, { label, area, leader });
+      const data = { label, area, leader, estados, productos: prods };
+      if (isNew) await createDoc("catalog/regions/items", data);
+      else        await updateDocById("catalog/regions/items", existing!.id, data);
       onClose();
     } finally { setSaving(false); }
   }
 
+  const checkboxClass = "flex items-center gap-2 text-[12.5px] text-[var(--color-ink-2)] cursor-pointer select-none";
+  const chipClass = (active: boolean) =>
+    `px-2.5 py-1 rounded-full text-[11.5px] font-medium border cursor-pointer transition-colors ${
+      active
+        ? "bg-[var(--color-mint-50)] border-green-300 text-green-700"
+        : "bg-[var(--color-surface-2)] border-[var(--color-line)] text-[var(--color-ink-3)] hover:border-green-300"
+    }`;
+
   return (
     <ModalShell title={isNew ? "Nueva región" : "Editar región"} onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-3">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Nombre de la región *</label>
           <input className={inputClass} required value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Ej. Región 1 · Hidalgo" />
         </div>
-        <div>
-          <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Área *</label>
-          <select className={inputClass} required value={area} onChange={(e) => setArea(e.target.value)}>
-            <option value="">Seleccionar área…</option>
-            {AREAS.map((a) => <option key={a} value={a}>{a}</option>)}
-          </select>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Área *</label>
+            <select className={inputClass} required value={area} onChange={(e) => setArea(e.target.value)}>
+              <option value="">Seleccionar área…</option>
+              {AREAS.map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Líder de región</label>
+            <select className={inputClass} value={leader} onChange={(e) => setLeader(e.target.value)}>
+              <option value="">Sin asignar</option>
+              {users.map((u) => <option key={u.id} value={u.fullName}>{u.fullName}</option>)}
+            </select>
+          </div>
         </div>
+
+        {/* Estados */}
         <div>
-          <label className="text-[11px] text-[var(--color-ink-4)] mb-1 block">Líder de región</label>
-          <select className={inputClass} value={leader} onChange={(e) => setLeader(e.target.value)}>
-            <option value="">Sin asignar</option>
-            {users.map((u) => <option key={u.id} value={u.fullName}>{u.fullName}</option>)}
-          </select>
+          <label className="text-[11px] text-[var(--color-ink-4)] mb-2 block">
+            Estados que cubre
+            {estados.length > 0 && <span className="ml-1.5 text-green-700 font-semibold">{estados.length} seleccionados</span>}
+          </label>
+          <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface-2)]">
+            {ESTADOS_MX.map((est) => (
+              <button key={est} type="button" onClick={() => toggleEstado(est)} className={chipClass(estados.includes(est))}>
+                {est}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="flex justify-end gap-2 pt-2">
+
+        {/* Productos */}
+        <div>
+          <label className="text-[11px] text-[var(--color-ink-4)] mb-2 block">
+            Productos que opera
+            {prods.length > 0 && <span className="ml-1.5 text-green-700 font-semibold">{prods.length} seleccionados</span>}
+          </label>
+          <div className="flex flex-wrap gap-1.5">
+            {products.map((p) => (
+              <button key={p.id} type="button" onClick={() => toggleProd(p.name)} className={chipClass(prods.includes(p.name))}>
+                {p.name}
+              </button>
+            ))}
+            {products.length === 0 && <span className="text-[12px] text-[var(--color-ink-4)]">Sin productos en catálogo.</span>}
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-1">
           <Button type="button" variant="secondary" size="sm" onClick={onClose}>Cancelar</Button>
           <Button type="submit" variant="primary" size="sm" disabled={saving}>{saving ? "Guardando…" : isNew ? "Crear" : "Guardar"}</Button>
         </div>
@@ -312,7 +374,7 @@ export function CatalogView() {
           <table className="w-full border-collapse text-[13px]">
             <thead>
               <tr className="border-b border-[var(--color-line)] bg-[var(--color-surface-2)]">
-                {["Región", "Área", "Líder", ""].map((h) => (
+                {["Región", "Área", "Líder", "Estados", "Productos", ""].map((h) => (
                   <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-4)]">{h}</th>
                 ))}
               </tr>
@@ -323,6 +385,12 @@ export function CatalogView() {
                   <td className="px-4 py-3 font-medium text-[var(--color-ink)]">{r.label}</td>
                   <td className="px-4 py-3 text-[var(--color-ink-3)]">{r.area}</td>
                   <td className="px-4 py-3 text-[var(--color-ink-3)]">{r.leader || "—"}</td>
+                  <td className="px-4 py-3 text-[var(--color-ink-3)]">
+                    {r.estados?.length ? r.estados.join(", ") : <span className="text-[var(--color-ink-4)]">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-[var(--color-ink-3)]">
+                    {r.productos?.length ? r.productos.join(", ") : <span className="text-[var(--color-ink-4)]">—</span>}
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1 justify-end">
                       <Button size="sm" variant="ghost" icon={<Edit size={13} />} onClick={() => setRegionModal(r)} />
@@ -331,7 +399,7 @@ export function CatalogView() {
                   </td>
                 </tr>
               ))}
-              {regions.length === 0 && <tr><td colSpan={4} className="px-4 py-12 text-center text-[13px] text-[var(--color-ink-4)]">Sin regiones configuradas.</td></tr>}
+              {regions.length === 0 && <tr><td colSpan={6} className="px-4 py-12 text-center text-[13px] text-[var(--color-ink-4)]">Sin regiones configuradas.</td></tr>}
             </tbody>
           </table>
         </div>
