@@ -6,6 +6,10 @@ import { createDoc, updateDocById } from "@/hooks/useFirestore";
 import { useUsers } from "@/hooks/useUsers";
 import { useLocations } from "@/hooks/useLocations";
 import { writeAuditEntry } from "@/services/audit";
+import { writeBatch, collection, doc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
+const BATCH_SIZE = 250;
 
 const MESES: Record<string, string> = {
   enero:"01", febrero:"02", marzo:"03", abril:"04", mayo:"05", junio:"06",
@@ -172,9 +176,15 @@ export function ImportWizard({ onClose, onImported }: Props) {
     setImporting(true);
     try {
       const toImport = parsedRows.map((r, idx) => processRow(r, idx));
-      await Promise.all(
-        toImport.map(row => {
-          const name = (row.mapped.fullName ?? "").trim();
+
+      // Split into chunks of BATCH_SIZE to stay within Firestore batch limits
+      for (let i = 0; i < toImport.length; i += BATCH_SIZE) {
+        const chunk = toImport.slice(i, i + BATCH_SIZE);
+        const batch = writeBatch(db);
+        const now   = serverTimestamp();
+
+        for (const row of chunk) {
+          const name  = (row.mapped.fullName ?? "").trim();
           const parts = name.split(" ");
           const payload = {
             numColaborador: row.mapped.numColaborador ?? "",
@@ -205,12 +215,19 @@ export function ImportWizard({ onClose, onImported }: Props) {
               initials: ((parts[0]?.[0] ?? "?") + (parts[parts.length > 1 ? parts.length - 1 : 0]?.[0] ?? "")).toUpperCase(),
               color: "c1",
             },
+            createdAt:  now,
+            updatedAt:  now,
           };
-          return row.existingId
-            ? updateDocById("users", row.existingId, payload)
-            : createDoc("users", payload);
-        })
-      );
+
+          if (row.existingId) {
+            batch.update(doc(collection(db, "users"), row.existingId), { ...payload, updatedAt: now });
+          } else {
+            batch.set(doc(collection(db, "users")), payload);
+          }
+        }
+
+        await batch.commit();
+      }
       await writeAuditEntry({
         action: "importó colaboradores",
         target: `${validation.total} filas (${validation.ok} OK · ${validation.warn} avisos · ${validation.err} incompletos)`,
