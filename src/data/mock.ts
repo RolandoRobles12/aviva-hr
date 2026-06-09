@@ -368,7 +368,7 @@ export const users: User[] = [
     hiredAt: "2022-01-10", hireMonths: 52,
     status: "active",
     laptop: "MBP-001", tablets: [], access: ["google","slack","hubspot","okta","avivaflat","notion","onepass"],
-    phone: "+52 55 1234 0001", hubspot: "1.10000001E8",
+    phone: "+52 55 1234 0001", hubspot: "1.10000001E8", slackOpsId: null,
   },
   {
     id: "u-002_03",
@@ -384,7 +384,7 @@ export const users: User[] = [
     hiredAt: "2022-06-01", hireMonths: 47,
     status: "active",
     laptop: "MBP-002", tablets: [], access: ["google","slack","okta","notion","factorial"],
-    phone: "+52 55 1234 0002", hubspot: null,
+    phone: "+52 55 1234 0002", hubspot: null, slackOpsId: null,
   },
   {
     id: "u-003_04",
@@ -400,7 +400,7 @@ export const users: User[] = [
     hiredAt: "2023-02-01", hireMonths: 39,
     status: "active",
     laptop: "MBP-003", tablets: ["TAB-101"], access: ["google","slack","hubspot","okta","avivaflat"],
-    phone: "+52 771 234 5678", hubspot: "1.20000001E8",
+    phone: "+52 771 234 5678", hubspot: "1.20000001E8", slackOpsId: null,
   },
   {
     id: "u-004_05",
@@ -416,7 +416,7 @@ export const users: User[] = [
     hiredAt: "2023-01-15", hireMonths: 40,
     status: "active",
     laptop: "MBP-004", tablets: ["TAB-102"], access: ["google","slack","hubspot","okta","avivaflat"],
-    phone: "+52 55 9876 1234", hubspot: "1.30000001E8",
+    phone: "+52 55 9876 1234", hubspot: "1.30000001E8", slackOpsId: null,
   },
   {
     id: "u-005_06",
@@ -432,7 +432,7 @@ export const users: User[] = [
     hiredAt: "2022-09-01", hireMonths: 44,
     status: "active",
     laptop: "MBP-005", tablets: [], access: ["google","slack","okta","notion","onepass","tablets"],
-    phone: "+52 55 1234 0005", hubspot: null,
+    phone: "+52 55 1234 0005", hubspot: null, slackOpsId: null,
   },
   {
     id: "u-006_07",
@@ -448,7 +448,7 @@ export const users: User[] = [
     hiredAt: "2023-03-01", hireMonths: 38,
     status: "active",
     laptop: "MBP-006", tablets: ["TAB-103"], access: ["google","slack","hubspot","okta","avivaflat"],
-    phone: "+52 222 456 7890", hubspot: "1.40000001E8",
+    phone: "+52 222 456 7890", hubspot: "1.40000001E8", slackOpsId: null,
   },
   {
     id: "u-007_08",
@@ -464,7 +464,7 @@ export const users: User[] = [
     hiredAt: "2023-07-01", hireMonths: 34,
     status: "active",
     laptop: "MBP-007", tablets: [], access: ["google","slack","notion","okta"],
-    phone: "+52 55 1234 0007", hubspot: null,
+    phone: "+52 55 1234 0007", hubspot: null, slackOpsId: null,
   },
   {
     id: "u-008_09",
@@ -480,7 +480,7 @@ export const users: User[] = [
     hiredAt: "2024-01-08", hireMonths: 16,
     status: "active",
     laptop: null, tablets: ["TAB-201"], access: ["google","slack","avivaflat"],
-    phone: "+52 771 345 6789", hubspot: null,
+    phone: "+52 771 345 6789", hubspot: null, slackOpsId: null,
   },
 ];
 
