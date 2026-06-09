@@ -14,8 +14,10 @@ import { OfferTemplatesView } from "@/views/templates/OfferTemplatesView";
 import { ContractTemplatesView } from "@/views/templates/ContractTemplatesView";
 import { EmailTemplatesView } from "@/views/templates/EmailTemplatesView";
 import { FormConfigView } from "@/views/templates/FormConfigView";
+import { DocsView } from "@/views/docs/DocsView";
 
 export const router = createBrowserRouter([
+  { path: "docs", element: <DocsView /> },
   {
     path: "/",
     element: <AppShell />,

@@ -13,7 +13,7 @@ const CLOUD_URL = "https://aviva-api-101284022421.us-central1.run.app";
 
 const NAV: { id: Section; label: string; sub: string }[] = [
   { id: "auth",      label: "Autenticación",      sub: "API Keys · Scopes · Errores" },
-  { id: "endpoints", label: "Referencia REST",     sub: "12 endpoints documentados" },
+  { id: "endpoints", label: "Referencia REST",     sub: "16 endpoints documentados" },
   { id: "webhooks",  label: "Guía de Webhooks",   sub: "Firma HMAC · Reintentos" },
   { id: "examples",  label: "Ejemplos de código",  sub: "cURL · Node.js · Python" },
   { id: "consola",   label: "Consola",             sub: "Prueba el API en vivo" },
@@ -159,14 +159,17 @@ function SectionAuth() {
         </thead>
         <tbody>
           {[
-            ["users:read",        "Leer el directorio de colaboradores (GET /users, GET /users/:id)."],
-            ["users:write",       "Crear y editar colaboradores (POST /users, PATCH /users/:id)."],
-            ["users:delete",      "Iniciar tickets de baja (POST /users/:id/offboard)."],
-            ["tickets:read",      "Consultar el estado de tickets de onboarding y offboarding."],
-            ["tickets:write",     "Aprobar etapas de un ticket (POST /tickets/:id/approve)."],
-            ["audit:read",        "Leer el log inmutable de auditoría (GET /audit)."],
-            ["events:write",      "Publicar eventos hacia webhooks externos."],
-            ["integrations:read", "Consultar el estado de apps conectadas (GET /integrations)."],
+            ["users:read",           "Leer el directorio de colaboradores (GET /users, GET /users/:id)."],
+            ["users:write",          "Crear y editar colaboradores (POST /users, PATCH /users/:id)."],
+            ["users:delete",         "Iniciar tickets de baja (POST /users/:id/offboard)."],
+            ["locations:read",       "Consultar locaciones (GET /locations, GET /locations/:id)."],
+            ["locations:write",      "Crear y editar locaciones (POST /locations, PATCH /locations/:id)."],
+            ["locations:delete",     "Eliminar locaciones (DELETE /locations/:id)."],
+            ["tickets:read",         "Consultar el estado de tickets de onboarding y offboarding."],
+            ["tickets:write",        "Aprobar etapas de un ticket (POST /tickets/:id/approve)."],
+            ["audit:read",           "Leer el log inmutable de auditoría (GET /audit)."],
+            ["events:write",         "Publicar eventos hacia webhooks externos."],
+            ["integrations:read",    "Consultar el estado de apps conectadas (GET /integrations)."],
           ].map(([scope, desc]) => (
             <tr key={scope} className="border-b border-dashed border-[var(--color-line)] last:border-0">
               <td className="py-2 pr-4 align-top"><IC>{scope}</IC></td>
@@ -230,7 +233,7 @@ const ENDPOINTS = [
     params: [
       { name: "region", type: "string",  desc: "Filtrar por ID de región. Ej: region-hidalgo" },
       { name: "estado", type: "string",  desc: "Estado de la república. Ej: Hidalgo" },
-      { name: "status", type: "string",  desc: "active | inactive | pending" },
+      { name: "status", type: "string",  desc: "active | offboarding | suspended" },
       { name: "q",      type: "string",  desc: "Búsqueda de texto libre en nombre, email o número." },
       { name: "page",   type: "integer", desc: "Página (default: 1)." },
       { name: "limit",  type: "integer", desc: "Resultados por página (default: 50, max: 200)." },
@@ -247,10 +250,12 @@ const ENDPOINTS = [
       "quiosco": "Tulancingo",
       "estado": "Hidalgo",
       "status": "active",
-      "fecha_ingreso": "2026-06-01"
+      "fecha_ingreso": "2026-06-01",
+      "hubspot": "12345678",
+      "slack_ops_id": "U08XXXXXXX"
     }
   ],
-  "meta": { "page": 1, "limit": 50, "total": 142 }
+  "meta": { "page": 1, "limit": 50, "total": 325 }
 }`,
   },
   {
@@ -264,11 +269,13 @@ const ENDPOINTS = [
   "nombre": "Adrián Contreras Zapata",
   "email": "adrian.contreras@avivacredito.com",
   "puesto": "Kiosk Manager",
-  "hub": "hub1-region_hidalgo",
+  "region": "region-hidalgo",
   "quiosco": "Tulancingo",
   "estado": "Hidalgo",
   "status": "active",
   "fecha_ingreso": "2026-06-01",
+  "hubspot": "12345678",
+  "slack_ops_id": "U08XXXXXXX",
   "jefe": { "id": "u-020_02", "nombre": "Marco Reyes" },
   "accesos": ["google", "slack", "okta", "hubspot"],
   "dispositivo": { "tipo": "tablet", "modelo": "Samsung Galaxy Tab A9" }
@@ -293,7 +300,7 @@ const ENDPOINTS = [
     response: `{
   "id": "u-385_02",
   "nombre": "Adrián Contreras Zapata",
-  "status": "pending",
+  "status": "active",
   "invite_sent": true,
   "invite_expires_at": "2026-06-10T00:00:00Z"
 }`,
@@ -444,7 +451,7 @@ const ENDPOINTS = [
 }`,
   },
   {
-    method: "GET", path: "/locations", scope: "users:read",
+    method: "GET", path: "/locations", scope: "locations:read",
     desc: "Lista paginada de locaciones (quioscos, tiendas, corporativos). Soporta filtros por estado, estatus y producto.",
     params: [
       { name: "estado",   type: "string",  desc: "Estado de la república. Ej: Hidalgo" },
@@ -475,6 +482,76 @@ const ENDPOINTS = [
     }
   ],
   "meta": { "page": 1, "limit": 50, "total": 34 }
+}`,
+  },
+  {
+    method: "GET", path: "/locations/:id", scope: "locations:read",
+    desc: "Detalle completo de una locación.",
+    params: [
+      { name: "id", type: "string", req: true, desc: "ID de la locación. Ej: loc-tulancingo-01" },
+    ],
+    response: `{
+  "id": "loc-tulancingo-01",
+  "code": "HGO-001",
+  "ciudad": "Tulancingo",
+  "estado": "Hidalgo",
+  "ubicacion": "Plaza Central Tulancingo",
+  "producto": "Aviva tu Compra",
+  "catLabel": "Aviva tu Compra",
+  "catShort": "AtC",
+  "catColor": "#1b3f8a",
+  "catBg": "#e3eeff",
+  "gerente": "Adrián Contreras Zapata",
+  "hub": "Hub Hidalgo",
+  "status": "open",
+  "fechaApertura": "2024-03-15"
+}`,
+  },
+  {
+    method: "POST", path: "/locations", scope: "locations:write",
+    desc: "Crea una nueva locación en el directorio.",
+    body: [
+      { name: "code",         type: "string", req: true,  desc: "Código único de la locación. Ej: HGO-002" },
+      { name: "ciudad",       type: "string", req: true,  desc: "Ciudad donde se ubica." },
+      { name: "estado",       type: "string", req: true,  desc: "Estado de la república." },
+      { name: "ubicacion",    type: "string", req: false, desc: "Nombre del centro comercial o dirección." },
+      { name: "producto",     type: "string", req: true,  desc: "Línea de producto. Ej: Aviva tu Compra" },
+      { name: "hub",          type: "string", req: true,  desc: "ID del hub al que pertenece." },
+      { name: "gerente",      type: "string", req: false, desc: "Nombre del gerente de la locación." },
+      { name: "fechaApertura",type: "date",   req: false, desc: "Fecha de apertura. Formato YYYY-MM-DD." },
+    ],
+    response: `{
+  "id": "loc-tulancingo-02",
+  "code": "HGO-002",
+  "status": "open",
+  "created_at": "2026-06-09T10:00:00Z"
+}`,
+  },
+  {
+    method: "PATCH", path: "/locations/:id", scope: "locations:write",
+    desc: "Edita campos parciales de una locación. Solo los campos enviados se modifican.",
+    body: [
+      { name: "gerente",   type: "string", desc: "Nuevo gerente." },
+      { name: "ubicacion", type: "string", desc: "Nueva dirección o nombre del centro comercial." },
+      { name: "status",    type: "string", desc: "open | closed" },
+      { name: "hub",       type: "string", desc: "ID del nuevo hub." },
+    ],
+    response: `{
+  "id": "loc-tulancingo-01",
+  "updated_fields": ["gerente", "status"],
+  "audit_id": "audit-20260609-loc1"
+}`,
+  },
+  {
+    method: "DELETE", path: "/locations/:id", scope: "locations:delete",
+    desc: "Elimina permanentemente una locación. Esta acción no se puede deshacer y queda registrada en auditoría.",
+    params: [
+      { name: "id", type: "string", req: true, desc: "ID de la locación a eliminar." },
+    ],
+    response: `{
+  "id": "loc-tulancingo-01",
+  "deleted": true,
+  "audit_id": "audit-20260609-loc2"
 }`,
   },
 ];
@@ -1402,7 +1479,7 @@ const CONSOLE_ENDPOINTS: ConsoleEp[] = [
     method: "GET", path: "/hr/v1/users", scope: "users:read", desc: "Lista colaboradores",
     queryParams: [
       { name: "hub",    placeholder: "hub1-region_hidalgo" },
-      { name: "status", placeholder: "active | inactive | pending" },
+      { name: "status", placeholder: "active | offboarding | suspended" },
       { name: "q",      placeholder: "nombre o email" },
       { name: "limit",  placeholder: "50" },
     ],
@@ -1682,6 +1759,56 @@ function SectionConsole() {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN PANEL
+// ── Standalone full-page version (used by /docs route) ────────────────────────
+export function APIDocsFullPage() {
+  const [section, setSection] = useState<Section>("auth");
+  return (
+    <div className="fixed inset-0 flex flex-col bg-[var(--color-bg)]">
+      <div className="flex items-center gap-4 px-6 py-4 border-b border-[var(--color-line)] bg-[var(--color-surface)] shrink-0">
+        <div className="size-8 rounded-lg bg-[var(--color-mint-50)] grid place-items-center">
+          <Link size={15} className="text-green-700" />
+        </div>
+        <div>
+          <div className="font-semibold text-[14px] text-[var(--color-ink)]">Documentación de la API · Aviva HR</div>
+          <code className="text-[11.5px] text-[var(--color-ink-3)] font-mono">{BASE_URL}</code>
+        </div>
+      </div>
+      <div className="flex flex-1 min-h-0">
+        <nav className="w-56 shrink-0 border-r border-[var(--color-line)] bg-[var(--color-surface)] py-4 overflow-y-auto">
+          {NAV.map((n) => (
+            <button key={n.id} onClick={() => setSection(n.id)}
+              className={cn("w-full text-left px-4 py-3 transition-colors",
+                section === n.id ? "bg-[var(--color-mint-50)] border-r-2 border-green-500" : "hover:bg-[var(--color-surface-2)]"
+              )}>
+              <div className={cn("text-[13px] font-medium", section === n.id ? "text-green-700" : "text-[var(--color-ink-2)]")}>{n.label}</div>
+              <div className="text-[11px] text-[var(--color-ink-4)] mt-0.5">{n.sub}</div>
+            </button>
+          ))}
+          <div className="mx-4 mt-6 pt-4 border-t border-[var(--color-line)]">
+            <div className="text-[11px] font-semibold text-[var(--color-ink-4)] uppercase tracking-wide mb-2">Versión</div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11.5px] font-mono text-[var(--color-ink-3)]">v1</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--color-mint-50)] text-green-700 font-medium">Estable</span>
+            </div>
+          </div>
+        </nav>
+        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+          {section === "endpoints" ? <SectionEndpoints /> : (
+            <div className="flex-1 overflow-y-auto">
+              <div className="max-w-3xl mx-auto px-8 py-7">
+                {section === "auth"     && <SectionAuth />}
+                {section === "webhooks" && <SectionWebhooks />}
+                {section === "examples" && <SectionExamples />}
+                {section === "consola"  && <SectionConsole />}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 export function APIDocsPanel({ onClose }: { onClose: () => void }) {
   const [section, setSection] = useState<Section>("auth");
@@ -1705,7 +1832,7 @@ export function APIDocsPanel({ onClose }: { onClose: () => void }) {
           </div>
           <div className="flex items-center gap-2 ml-auto">
             <a
-              href={`${BASE_URL}/docs`}
+              href="/docs"
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 text-[12.5px] text-[var(--color-ink-3)] hover:text-[var(--color-ink)] transition-colors"

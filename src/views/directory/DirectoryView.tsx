@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useUsers } from "@/hooks/useUsers";
 import { useIntegrations } from "@/hooks/useIntegrations";
 import { updateUser, createUser } from "@/services/users";
-import { useCollection } from "@/hooks/useFirestore";
+import { useCollection, deleteDocById } from "@/hooks/useFirestore";
 import { useLocations } from "@/hooks/useLocations";
 import { useCatalog } from "@/context/CatalogContext";
 import { useNotif } from "@/context/NotifContext";
@@ -301,10 +301,20 @@ function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; 
           ))}
           {editing && <span className="py-3 text-[13px] font-medium text-[var(--color-ink)]">Información</span>}
           {!editing && tab === "info" && (
-            <button onClick={() => setEditing(true)}
-              className="ml-auto px-3 py-1.5 text-[12px] font-medium rounded-[var(--radius-sm)] border border-[var(--color-line)] text-[var(--color-ink-2)] hover:bg-[var(--color-surface-2)] transition-colors">
-              Editar
-            </button>
+            <div className="ml-auto flex items-center gap-2">
+              <button onClick={() => setEditing(true)}
+                className="px-3 py-1.5 text-[12px] font-medium rounded-[var(--radius-sm)] border border-[var(--color-line)] text-[var(--color-ink-2)] hover:bg-[var(--color-surface-2)] transition-colors">
+                Editar
+              </button>
+              <button onClick={async () => {
+                if (!window.confirm(`¿Eliminar a ${user.fullName}? Esta acción no se puede deshacer.`)) return;
+                await deleteDocById("users", user.id);
+                onClose();
+              }}
+                className="px-3 py-1.5 text-[12px] font-medium rounded-[var(--radius-sm)] border border-[var(--color-line)] text-[var(--color-danger-fg)] hover:bg-[var(--color-surface-2)] transition-colors">
+                Eliminar
+              </button>
+            </div>
           )}
         </div>
 
