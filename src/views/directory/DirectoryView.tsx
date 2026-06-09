@@ -569,6 +569,8 @@ export function DirectoryView() {
   const [drawer,   setDrawer]   = useState<(User & { id: string }) | null>(null);
   const [importing, setImporting] = useState(false);
   const [newUserOpen, setNewUserOpen] = useState(false);
+  const [page,     setPage]     = useState(1);
+  const PAGE_SIZE = 50;
 
   function exportCSV() {
     const headers = ["Número","Nombre completo","Email","Puesto","Región","Quiósco","Estado","Empresa","Estatus","Antigüedad (meses)"];
@@ -591,6 +593,7 @@ export function DirectoryView() {
   const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
   const filtered = useMemo(() => {
+    setPage(1);
     let arr = users.filter((u) => {
       if (tab !== "all" && u.status !== tab) return false;
       if (regionF !== "all" && u.region !== regionF) return false;
@@ -613,6 +616,9 @@ export function DirectoryView() {
     if (sortBy === "recent")  arr = [...arr].sort((a, b) => (b.hiredAt ?? "").localeCompare(a.hiredAt ?? ""));
     return arr;
   }, [users, tab, query, regionF, estadoF, sortBy]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const counts = useMemo(() => {
     const m: Record<string, number> = { all: users.length };
@@ -704,6 +710,21 @@ export function DirectoryView() {
               <option value="recent">Más recientes</option>
             </select>
             <span className="text-[12px] text-[var(--color-ink-4)] ml-2">{filtered.length} resultados</span>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1 ml-3">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="px-2 h-7 rounded text-[12px] border border-[var(--color-line)] disabled:opacity-30 hover:bg-[var(--color-surface-2)]"
+                >‹</button>
+                <span className="text-[12px] text-[var(--color-ink-3)] px-1">{page} / {totalPages}</span>
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="px-2 h-7 rounded text-[12px] border border-[var(--color-line)] disabled:opacity-30 hover:bg-[var(--color-surface-2)]"
+                >›</button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -726,7 +747,7 @@ export function DirectoryView() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((u) => {
+              {paginated.map((u) => {
                 const mgr = users.find((x) => x.id === u.manager);
                 const sel = selected.has(u.id);
                 return (
@@ -777,7 +798,7 @@ export function DirectoryView() {
       {layout === "grid" && (
         <div className="flex-1 overflow-auto p-5">
           <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
-            {filtered.map((u) => (
+            {paginated.map((u) => (
               <UserCard
                 key={u.id}
                 user={u}
