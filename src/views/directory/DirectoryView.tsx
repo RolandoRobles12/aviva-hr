@@ -556,7 +556,7 @@ function BulkBar({ count, total, onSelectAll, onClear, onOffboard }: {
         </>
       )}
       <div className="w-px h-4 bg-white/20" />
-      <button onClick={onOffboard} className="text-[12.5px] text-[var(--color-danger-fg)] hover:opacity-80 transition-opacity">Iniciar baja</button>
+      <button onClick={onOffboard} className="text-[12.5px] text-red-400 hover:text-red-300 transition-colors">Iniciar baja</button>
       <div className="w-px h-4 bg-white/20" />
       <button onClick={onClear} className="text-[12px] text-white/60 hover:text-white transition-colors">Cancelar</button>
     </div>
