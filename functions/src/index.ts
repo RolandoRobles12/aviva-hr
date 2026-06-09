@@ -19,3 +19,5 @@ export {
   executeOffboarding,
   onOffboardingTicketCreated,
 } from "./tickets";
+
+export { dailyIntegrationSync } from "./integrationSync";

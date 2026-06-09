@@ -65,6 +65,7 @@ export interface User {
   access: string[];
   phone: string;
   hubspot: string | null;
+  slackOpsId: string | null;
   dealOwner?: boolean;
 }
 

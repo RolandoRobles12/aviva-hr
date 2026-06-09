@@ -44,6 +44,7 @@ const TARGETS = [
   { id: "area",           label: "Área",                 required: false, hints: ["Área", "Area"] },
   { id: "managerName",    label: "Jefe Inmediato",       required: false, hints: ["Jefe Inmediato", "Jefe inmediato", "Supervisor"] },
   { id: "hubspot",        label: "HubSpot ID",           required: false, hints: ["HubSpot ID", "Hubspot ID"] },
+  { id: "slackOpsId",    label: "Slack Ops ID",         required: false, hints: ["Slack ID", "Slack Ops ID", "SlackOpsId"] },
   { id: "phone",          label: "Teléfono",             required: false, hints: ["Teléfono", "WhatsApp", "Celular"] },
 ] as const;
 
@@ -193,6 +194,7 @@ export function ImportWizard({ onClose, onImported }: Props) {
             talla:          row.mapped.talla        ?? "",
             phone:          row.mapped.phone        ?? "",
             hubspot:        row.mapped.hubspot      || null,
+            slackOpsId:     row.mapped.slackOpsId   || null,
             region:         (row.mapped.region ?? "").toLowerCase().replace(/\s+/g, "_"),
             status:         "invited",
             access:         [],
