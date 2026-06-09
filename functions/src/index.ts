@@ -20,4 +20,4 @@ export {
   onOffboardingTicketCreated,
 } from "./tickets";
 
-export { dailyIntegrationSync } from "./integrationSync";
+export { dailyIntegrationSync, manualIntegrationSync } from "./integrationSync";
