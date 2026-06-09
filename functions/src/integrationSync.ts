@@ -19,36 +19,52 @@ export const dailyIntegrationSync = functions
       return;
     }
 
-    // Fetch users that are missing both IDs
-    const snap = await db.collection("users")
-      .where("hubspot",    "==", null)
-      .where("slackOpsId", "==", null)
-      .get();
+    // Two separate queries since Firestore doesn't support OR filters.
+    // Union by doc ID to avoid processing the same user twice.
+    const [missingHubspot, missingSlack] = await Promise.all([
+      db.collection("users").where("hubspot",    "==", null).get(),
+      db.collection("users").where("slackOpsId", "==", null).get(),
+    ]);
 
-    if (snap.empty) {
+    const pendingById = new Map<string, FirebaseFirestore.QueryDocumentSnapshot>();
+    for (const doc of [...missingHubspot.docs, ...missingSlack.docs]) {
+      pendingById.set(doc.id, doc);
+    }
+
+    if (pendingById.size === 0) {
       functions.logger.info("dailyIntegrationSync: no hay usuarios pendientes, nada que sincronizar.");
       return;
     }
 
-    functions.logger.info(`dailyIntegrationSync: procesando ${snap.size} usuario(s) sin IDs.`);
+    functions.logger.info(`dailyIntegrationSync: procesando ${pendingById.size} usuario(s) con al menos un ID faltante.`);
 
-    // Build HubSpot owners map (email -> ownerId)
-    const ownersByEmail = await fetchHubSpotOwners(hubspotKey);
+    // Only fetch HubSpot owners if at least one user needs it
+    const needsHubspot = missingHubspot.size > 0;
+    const ownersByEmail = needsHubspot
+      ? await fetchHubSpotOwners(hubspotKey)
+      : new Map<string, string>();
 
     const slackClient = new WebClient(slackToken);
     const batch       = db.batch();
     let synced        = 0;
 
-    for (const userDoc of snap.docs) {
-      const email = (userDoc.data().email as string | undefined)?.toLowerCase();
+    for (const userDoc of pendingById.values()) {
+      const data  = userDoc.data();
+      const email = (data.email as string | undefined)?.toLowerCase();
       if (!email) continue;
 
-      const hubspotId  = ownersByEmail.get(email) ?? null;
-      const slackOpsId = await lookupSlackId(slackClient, email);
+      const updates: Record<string, string | null> = {};
 
-      // Only write if at least one ID was resolved
-      if (hubspotId !== null || slackOpsId !== null) {
-        batch.update(userDoc.ref, { hubspot: hubspotId, slackOpsId });
+      if (data.hubspot === null || data.hubspot === undefined) {
+        updates.hubspot = ownersByEmail.get(email) ?? null;
+      }
+
+      if (data.slackOpsId === null || data.slackOpsId === undefined) {
+        updates.slackOpsId = await lookupSlackId(slackClient, email);
+      }
+
+      if (Object.values(updates).some(v => v !== null)) {
+        batch.update(userDoc.ref, updates);
         synced++;
       }
     }
