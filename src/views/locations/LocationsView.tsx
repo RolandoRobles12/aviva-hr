@@ -282,6 +282,8 @@ export function LocationsView() {
   const [productoF,  setProductoF]  = useState("all");
   const [sortCol,    setSortCol]    = useState<SortCol>("code");
   const [sortDir,    setSortDir]    = useState<"asc" | "desc">("asc");
+  const [page,     setPage]     = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [selected,   setSelected]   = useState<(Location & { id: string }) | null>(null);
   const [locModal,   setLocModal]   = useState<(Location & { id: string }) | "new" | null>(null);
   const [importing,  setImporting]  = useState(false);
@@ -320,6 +322,7 @@ export function LocationsView() {
   }
 
   const filtered = useMemo(() => {
+    setPage(1);
     const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
     const base = locations.filter((l) => {
       if (estadoF   !== "all" && l.estado   !== estadoF)   return false;
@@ -349,6 +352,9 @@ export function LocationsView() {
       return sortDir === "asc" ? cmp : -cmp;
     });
   }, [locations, query, estadoF, statusF, productoF, sortCol, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginated  = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   const allChecked  = filtered.length > 0 && filtered.every((l) => checkedIds.has(l.id));
   const someChecked = !allChecked && filtered.some((l) => checkedIds.has(l.id));
@@ -388,6 +394,19 @@ export function LocationsView() {
         </select>
         <div className="ml-auto flex items-center gap-2">
           <span className="text-[12px] text-[var(--color-ink-4)]">{filtered.length} locaciones</span>
+          <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+            className="h-8 px-2 text-[12.5px] rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-2)] outline-none">
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+          </select>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+              className="px-2 h-7 rounded text-[12px] border border-[var(--color-line)] disabled:opacity-30 hover:bg-[var(--color-surface-2)]">‹</button>
+            <span className="text-[12px] text-[var(--color-ink-3)] px-1">{page} / {totalPages}</span>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              className="px-2 h-7 rounded text-[12px] border border-[var(--color-line)] disabled:opacity-30 hover:bg-[var(--color-surface-2)]">›</button>
+          </div>
           <Button variant="secondary" size="sm" icon={<Upload size={13} />} onClick={() => setImporting(true)}>Importar</Button>
           <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={() => setLocModal("new")}>Nueva locación</Button>
         </div>
@@ -443,7 +462,7 @@ export function LocationsView() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((l) => {
+            {paginated.map((l) => {
               const statusCfg = STATUS_LABELS[l.status] ?? STATUS_LABELS.open;
               return (
                 <tr key={l.id} onClick={() => setSelected(l)}

@@ -230,7 +230,7 @@ const ENDPOINTS = [
     params: [
       { name: "region", type: "string",  desc: "Filtrar por ID de región. Ej: region-hidalgo" },
       { name: "estado", type: "string",  desc: "Estado de la república. Ej: Hidalgo" },
-      { name: "status", type: "string",  desc: "active | inactive | pending" },
+      { name: "status", type: "string",  desc: "active | offboarding | suspended" },
       { name: "q",      type: "string",  desc: "Búsqueda de texto libre en nombre, email o número." },
       { name: "page",   type: "integer", desc: "Página (default: 1)." },
       { name: "limit",  type: "integer", desc: "Resultados por página (default: 50, max: 200)." },
@@ -247,10 +247,12 @@ const ENDPOINTS = [
       "quiosco": "Tulancingo",
       "estado": "Hidalgo",
       "status": "active",
-      "fecha_ingreso": "2026-06-01"
+      "fecha_ingreso": "2026-06-01",
+      "hubspot": "12345678",
+      "slack_ops_id": "U08XXXXXXX"
     }
   ],
-  "meta": { "page": 1, "limit": 50, "total": 142 }
+  "meta": { "page": 1, "limit": 50, "total": 325 }
 }`,
   },
   {
@@ -264,11 +266,13 @@ const ENDPOINTS = [
   "nombre": "Adrián Contreras Zapata",
   "email": "adrian.contreras@avivacredito.com",
   "puesto": "Kiosk Manager",
-  "hub": "hub1-region_hidalgo",
+  "region": "region-hidalgo",
   "quiosco": "Tulancingo",
   "estado": "Hidalgo",
   "status": "active",
   "fecha_ingreso": "2026-06-01",
+  "hubspot": "12345678",
+  "slack_ops_id": "U08XXXXXXX",
   "jefe": { "id": "u-020_02", "nombre": "Marco Reyes" },
   "accesos": ["google", "slack", "okta", "hubspot"],
   "dispositivo": { "tipo": "tablet", "modelo": "Samsung Galaxy Tab A9" }
@@ -293,7 +297,7 @@ const ENDPOINTS = [
     response: `{
   "id": "u-385_02",
   "nombre": "Adrián Contreras Zapata",
-  "status": "pending",
+  "status": "active",
   "invite_sent": true,
   "invite_expires_at": "2026-06-10T00:00:00Z"
 }`,
@@ -1402,7 +1406,7 @@ const CONSOLE_ENDPOINTS: ConsoleEp[] = [
     method: "GET", path: "/hr/v1/users", scope: "users:read", desc: "Lista colaboradores",
     queryParams: [
       { name: "hub",    placeholder: "hub1-region_hidalgo" },
-      { name: "status", placeholder: "active | inactive | pending" },
+      { name: "status", placeholder: "active | offboarding | suspended" },
       { name: "q",      placeholder: "nombre o email" },
       { name: "limit",  placeholder: "50" },
     ],
@@ -1682,6 +1686,56 @@ function SectionConsole() {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN PANEL
+// ── Standalone full-page version (used by /docs route) ────────────────────────
+export function APIDocsFullPage() {
+  const [section, setSection] = useState<Section>("auth");
+  return (
+    <div className="fixed inset-0 flex flex-col bg-[var(--color-bg)]">
+      <div className="flex items-center gap-4 px-6 py-4 border-b border-[var(--color-line)] bg-[var(--color-surface)] shrink-0">
+        <div className="size-8 rounded-lg bg-[var(--color-mint-50)] grid place-items-center">
+          <Link size={15} className="text-green-700" />
+        </div>
+        <div>
+          <div className="font-semibold text-[14px] text-[var(--color-ink)]">Documentación de la API · Aviva HR</div>
+          <code className="text-[11.5px] text-[var(--color-ink-3)] font-mono">{BASE_URL}</code>
+        </div>
+      </div>
+      <div className="flex flex-1 min-h-0">
+        <nav className="w-56 shrink-0 border-r border-[var(--color-line)] bg-[var(--color-surface)] py-4 overflow-y-auto">
+          {NAV.map((n) => (
+            <button key={n.id} onClick={() => setSection(n.id)}
+              className={cn("w-full text-left px-4 py-3 transition-colors",
+                section === n.id ? "bg-[var(--color-mint-50)] border-r-2 border-green-500" : "hover:bg-[var(--color-surface-2)]"
+              )}>
+              <div className={cn("text-[13px] font-medium", section === n.id ? "text-green-700" : "text-[var(--color-ink-2)]")}>{n.label}</div>
+              <div className="text-[11px] text-[var(--color-ink-4)] mt-0.5">{n.sub}</div>
+            </button>
+          ))}
+          <div className="mx-4 mt-6 pt-4 border-t border-[var(--color-line)]">
+            <div className="text-[11px] font-semibold text-[var(--color-ink-4)] uppercase tracking-wide mb-2">Versión</div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11.5px] font-mono text-[var(--color-ink-3)]">v1</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--color-mint-50)] text-green-700 font-medium">Estable</span>
+            </div>
+          </div>
+        </nav>
+        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+          {section === "endpoints" ? <SectionEndpoints /> : (
+            <div className="flex-1 overflow-y-auto">
+              <div className="max-w-3xl mx-auto px-8 py-7">
+                {section === "auth"     && <SectionAuth />}
+                {section === "webhooks" && <SectionWebhooks />}
+                {section === "examples" && <SectionExamples />}
+                {section === "consola"  && <SectionConsole />}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 export function APIDocsPanel({ onClose }: { onClose: () => void }) {
   const [section, setSection] = useState<Section>("auth");
@@ -1705,7 +1759,7 @@ export function APIDocsPanel({ onClose }: { onClose: () => void }) {
           </div>
           <div className="flex items-center gap-2 ml-auto">
             <a
-              href={`${BASE_URL}/docs`}
+              href="/docs"
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 text-[12.5px] text-[var(--color-ink-3)] hover:text-[var(--color-ink)] transition-colors"
