@@ -73,6 +73,7 @@ function NewUserModal({ onClose }: { onClose: () => void }) {
         status: "invited",
         laptop: null, tablets: [], access: [],
         hubspot: null,
+        slackOpsId: null,
       });
       notify({ title: "Alta creada", body: `${first} ${last} · Invitación pendiente.`, kind: "onboard" });
       onClose();
@@ -330,6 +331,7 @@ function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; 
                   ["Antigüedad",     `${monthsSince(user.hiredAt)} meses`],
                   ["Talla",          user.talla],
                   ["Deal Owner",     user.hubspot ? "Sí" : "No"],
+                  ["Slack Ops ID",   user.slackOpsId ?? "—"],
                 ].map(([label, value]) => (
                   <div key={label}>
                     <div className="text-[11px] text-[var(--color-ink-4)] mb-0.5">{label}</div>
