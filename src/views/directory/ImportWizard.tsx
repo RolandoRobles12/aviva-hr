@@ -2,7 +2,7 @@ import { useState, useMemo, useRef } from "react";
 import { Check, Close, Download, Upload, Warn } from "@/components/icons";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
-import { createDoc, updateDocById } from "@/hooks/useFirestore";
+import { createDoc, updateDocById, useCollection } from "@/hooks/useFirestore";
 import { useUsers } from "@/hooks/useUsers";
 import { useLocations } from "@/hooks/useLocations";
 import { writeAuditEntry } from "@/services/audit";
@@ -97,16 +97,72 @@ interface Props {
 export function ImportWizard({ onClose, onImported }: Props) {
   const { data: existingUsers } = useUsers();
   const { data: locations } = useLocations();
+  const { data: positions } = useCollection<{ name: string }>("catalog/positions/items");
 
   function resolveQuiosco(raw: string): string {
     if (!raw) return "";
     const n = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
-    const match = locations.find((l) => {
+
+    // Map suffix → keywords that should appear in the location's producto/catLabel
+    const SUFFIX_MAP: { sfx: string; keywords: string[] }[] = [
+      { sfx: " mba",  keywords: ["compra", "aurrera", "bodega"] },
+      { sfx: " ba",   keywords: ["compra", "aurrera", "bodega"] },
+      { sfx: " sba",  keywords: ["compra", "aurrera", "bodega"] },
+      { sfx: " wm",   keywords: ["walmart"] },
+      { sfx: " cm",   keywords: ["marchand", "casa marchand"] },
+      { sfx: " cr",   keywords: ["casa", "construrama"] },
+      { sfx: " atn",  keywords: ["negocio"] },
+      { sfx: " atc",  keywords: ["contigo"] },
+    ];
+
+    const nraw = n(raw);
+    let base = nraw;
+    let productKeywords: string[] = [];
+
+    for (const { sfx, keywords } of SUFFIX_MAP) {
+      if (nraw.endsWith(sfx)) {
+        base = nraw.slice(0, -sfx.length).trim();
+        productKeywords = keywords;
+        break;
+      }
+    }
+
+    // Try exact match first (full raw string against ubicacion/ciudad/code)
+    const exactMatch = locations.find((l) => {
       const display = l.ubicacion ?? l.ciudad;
-      return n(display) === n(raw) || n(l.ciudad) === n(raw) || n(l.code) === n(raw);
+      return n(display) === nraw || n(l.ciudad) === nraw || n(l.code) === nraw;
     });
-    return match ? (match.ubicacion ?? match.ciudad) : raw;
+    if (exactMatch) return exactMatch.ubicacion ?? exactMatch.ciudad;
+
+    // If suffix was detected, match city + product category
+    const candidates = locations.filter((l) => n(l.ciudad) === base);
+    if (candidates.length === 1) return candidates[0].ubicacion ?? candidates[0].ciudad;
+
+    if (candidates.length > 1 && productKeywords.length > 0) {
+      const refined = candidates.find((l) => {
+        const prod = n(l.producto ?? l.catLabel ?? "");
+        return productKeywords.some((kw) => prod.includes(kw));
+      });
+      if (refined) return refined.ubicacion ?? refined.ciudad;
+    }
+
+    // Fall back to first city match or raw value
+    return candidates[0]?.ubicacion ?? candidates[0]?.ciudad ?? raw;
   }
+
+  function resolveRole(raw: string): string {
+    if (!raw) return raw;
+    const n = (s: string) =>
+      s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\/a\b/g, "").trim();
+    const nraw = n(raw);
+    // Exact normalized match
+    const exact = positions.find((p) => n(p.name) === nraw);
+    if (exact) return exact.name;
+    // Partial match: catalog name starts with or contains the CSV value
+    const partial = positions.find((p) => n(p.name).includes(nraw) || nraw.includes(n(p.name)));
+    return partial ? partial.name : raw;
+  }
+
   const [step, setStep]               = useState(0);
   const [file, setFile]               = useState<File | null>(null);
   const [parsedRows, setParsedRows]   = useState<string[][]>([]);
@@ -193,7 +249,7 @@ export function ImportWizard({ onClose, onImported }: Props) {
             first:          parts[0] ?? "",
             last:           parts.slice(1).join(" "),
             email:          row.mapped.email        ?? "",
-            role:           row.mapped.role         ?? "",
+            role:           resolveRole(row.mapped.role ?? ""),
             empresa:        row.mapped.empresa      ?? "",
             quiosco:        resolveQuiosco(row.mapped.quiosco ?? ""),
             estado:         row.mapped.estado       ?? "",
