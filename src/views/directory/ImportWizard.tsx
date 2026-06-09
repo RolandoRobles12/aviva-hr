@@ -103,6 +103,17 @@ export function ImportWizard({ onClose, onImported }: Props) {
     if (!raw) return "";
     const n = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 
+    function editDist(a: string, b: string): number {
+      const m = a.length, blen = b.length;
+      const dp = Array.from({ length: m + 1 }, (_, i) =>
+        Array.from({ length: blen + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
+      );
+      for (let i = 1; i <= m; i++)
+        for (let j = 1; j <= blen; j++)
+          dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      return dp[m][blen];
+    }
+
     // Map suffix → keywords that should appear in the location's producto/catLabel
     const SUFFIX_MAP: { sfx: string; keywords: string[] }[] = [
       { sfx: " mba",  keywords: ["compra", "aurrera", "bodega"] },
@@ -127,17 +138,37 @@ export function ImportWizard({ onClose, onImported }: Props) {
       }
     }
 
-    // Try exact match first (full raw string against ubicacion/ciudad/code)
+    // Also handle prefix format: "CM Plaza Civac" instead of "Plaza Civac CM"
+    if (!productKeywords.length) {
+      const PREFIX_MAP: { pfx: string; keywords: string[] }[] = [
+        { pfx: "mba ", keywords: ["compra", "aurrera", "bodega"] },
+        { pfx: "ba ",  keywords: ["compra", "aurrera", "bodega"] },
+        { pfx: "sba ", keywords: ["compra", "aurrera", "bodega"] },
+        { pfx: "wm ",  keywords: ["walmart"] },
+        { pfx: "cm ",  keywords: ["marchand", "casa marchand"] },
+        { pfx: "cr ",  keywords: ["casa", "construrama"] },
+        { pfx: "atn ", keywords: ["negocio"] },
+        { pfx: "atc ", keywords: ["contigo"] },
+      ];
+      for (const { pfx, keywords } of PREFIX_MAP) {
+        if (nraw.startsWith(pfx)) {
+          base = nraw.slice(pfx.length).trim();
+          productKeywords = keywords;
+          break;
+        }
+      }
+    }
+
+    // Exact match (full raw string against ubicacion/ciudad/code)
     const exactMatch = locations.find((l) => {
       const display = l.ubicacion ?? l.ciudad;
       return n(display) === nraw || n(l.ciudad) === nraw || n(l.code) === nraw;
     });
     if (exactMatch) return exactMatch.id!;
 
-    // If suffix was detected, match city + product category
+    // Exact city match with suffix disambiguation
     const candidates = locations.filter((l) => n(l.ciudad) === base);
     if (candidates.length === 1) return candidates[0].id!;
-
     if (candidates.length > 1 && productKeywords.length > 0) {
       const refined = candidates.find((l) => {
         const prod = n(l.producto ?? l.catLabel ?? "");
@@ -145,9 +176,24 @@ export function ImportWizard({ onClose, onImported }: Props) {
       });
       if (refined) return refined.id!;
     }
+    if (candidates[0]) return candidates[0].id!;
 
-    // Fall back to first city match or raw value
-    return candidates[0]?.id ?? raw;
+    // Fuzzy city match (edit distance ≤ 2) for typos in CSV
+    const fuzzy = locations
+      .map((l) => ({ l, d: editDist(n(l.ciudad), base) }))
+      .filter(({ d }) => d <= 2)
+      .sort((a, b) => a.d - b.d);
+    if (fuzzy.length === 1) return fuzzy[0].l.id!;
+    if (fuzzy.length > 1 && productKeywords.length > 0) {
+      const refined = fuzzy.find(({ l }) => {
+        const prod = n(l.producto ?? l.catLabel ?? "");
+        return productKeywords.some((kw) => prod.includes(kw));
+      });
+      if (refined) return refined.l.id!;
+    }
+    if (fuzzy[0]) return fuzzy[0].l.id!;
+
+    return raw;
   }
 
   function resolveRole(raw: string): string {
