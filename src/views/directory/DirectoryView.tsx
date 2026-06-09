@@ -153,7 +153,7 @@ function NewUserModal({ onClose }: { onClose: () => void }) {
                 onChange={setQuiosco}
                 placeholder="Buscar quiósco…"
                 emptyLabel="Sin asignar"
-                options={locations.map((l) => ({ value: l.ubicacion ?? l.ciudad, label: l.ubicacion ?? l.ciudad, sub: l.code }))}
+                options={locations.map((l) => ({ value: l.id!, label: l.ubicacion ?? l.ciudad, sub: l.code }))}
               />
             </div>
             <div>
@@ -418,7 +418,7 @@ function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; 
                     onChange={setQuiosco}
                     placeholder="Buscar quiósco…"
                     emptyLabel="Sin asignar"
-                    options={locations.map((l) => ({ value: l.ubicacion ?? l.ciudad, label: l.ubicacion ?? l.ciudad, sub: l.code }))}
+                    options={locations.map((l) => ({ value: l.id!, label: l.ubicacion ?? l.ciudad, sub: l.code }))}
                   />
                 </div>
                 <div>
