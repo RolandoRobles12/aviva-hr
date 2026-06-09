@@ -518,12 +518,13 @@ function UserDetail({ user, allUsers, onClose }: { user: User & { id: string }; 
 }
 
 // ── Grid card ─────────────────────────────────────────────────────────────────
-function UserCard({ user, selected, onToggle, onClick, regionLabel }: {
+function UserCard({ user, selected, onToggle, onClick, regionLabel, quioscoLabel }: {
   user: User & { id: string };
   selected: boolean;
   onToggle: (e: React.MouseEvent) => void;
   onClick: () => void;
   regionLabel: (id: string) => string;
+  quioscoLabel: (val: string | undefined) => string;
 }) {
   return (
     <div
@@ -874,6 +875,7 @@ export function DirectoryView() {
                 onToggle={(e) => toggleRow(u.id, e)}
                 onClick={() => setDrawer(u)}
                 regionLabel={regionLabel}
+                quioscoLabel={quioscoLabel}
               />
             ))}
             {filtered.length === 0 && (
