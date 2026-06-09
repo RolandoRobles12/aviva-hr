@@ -174,10 +174,10 @@ export function ImportWizard({ onClose, onImported }: Props) {
 
   async function doImport() {
     setImporting(true);
+    let totalWritten = 0;
     try {
       const toImport = parsedRows.map((r, idx) => processRow(r, idx));
 
-      // Split into chunks of BATCH_SIZE to stay within Firestore batch limits
       for (let i = 0; i < toImport.length; i += BATCH_SIZE) {
         const chunk = toImport.slice(i, i + BATCH_SIZE);
         const batch = writeBatch(db);
@@ -219,22 +219,27 @@ export function ImportWizard({ onClose, onImported }: Props) {
             updatedAt:  now,
           };
 
-          if (row.existingId) {
-            batch.update(doc(collection(db, "users"), row.existingId), { ...payload, updatedAt: now });
-          } else {
-            batch.set(doc(collection(db, "users")), payload);
-          }
+          // set+merge works for both new and existing documents
+          const ref = row.existingId
+            ? doc(db, "users", row.existingId)
+            : doc(collection(db, "users"));
+          batch.set(ref, payload, { merge: true });
         }
 
         await batch.commit();
+        totalWritten += chunk.length;
       }
+
       await writeAuditEntry({
         action: "importó colaboradores",
-        target: `${validation.total} filas (${validation.ok} OK · ${validation.warn} avisos · ${validation.err} incompletos)`,
+        target: `${totalWritten} colaboradores escritos (${validation.ok} OK · ${validation.warn} avisos · ${validation.err} incompletos)`,
         source: "manual",
       });
-      onImported?.({ ok: validation.ok, warn: validation.warn, err: validation.err, total: validation.total });
+      onImported?.({ ok: validation.ok, warn: validation.warn, err: validation.err, total: totalWritten });
       setStep(3);
+    } catch (err) {
+      console.error("Error en import:", err);
+      alert(`Error al importar: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setImporting(false);
     }
