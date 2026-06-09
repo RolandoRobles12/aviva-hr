@@ -148,8 +148,9 @@ export function ImportWizard({ onClose, onImported }: Props) {
       if (colIdx == null) return;
       mapped[t.id] = (r[colIdx] || "").trim();
     });
-    const existing = existingUsers.find(
-      (u) => u.email === mapped.email || u.numColaborador === mapped.numColaborador
+    const existing = existingUsers.find((u) =>
+      (mapped.email         && u.email          === mapped.email) ||
+      (mapped.numColaborador && u.numColaborador === mapped.numColaborador)
     );
     return { idx, mapped, existingId: existing?.id ?? null };
   }
