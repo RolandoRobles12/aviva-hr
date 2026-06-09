@@ -138,6 +138,27 @@ export function ImportWizard({ onClose, onImported }: Props) {
       }
     }
 
+    // Also handle prefix format: "CM Plaza Civac" instead of "Plaza Civac CM"
+    if (!productKeywords.length) {
+      const PREFIX_MAP: { pfx: string; keywords: string[] }[] = [
+        { pfx: "mba ", keywords: ["compra", "aurrera", "bodega"] },
+        { pfx: "ba ",  keywords: ["compra", "aurrera", "bodega"] },
+        { pfx: "sba ", keywords: ["compra", "aurrera", "bodega"] },
+        { pfx: "wm ",  keywords: ["walmart"] },
+        { pfx: "cm ",  keywords: ["marchand", "casa marchand"] },
+        { pfx: "cr ",  keywords: ["casa", "construrama"] },
+        { pfx: "atn ", keywords: ["negocio"] },
+        { pfx: "atc ", keywords: ["contigo"] },
+      ];
+      for (const { pfx, keywords } of PREFIX_MAP) {
+        if (nraw.startsWith(pfx)) {
+          base = nraw.slice(pfx.length).trim();
+          productKeywords = keywords;
+          break;
+        }
+      }
+    }
+
     // Exact match (full raw string against ubicacion/ciudad/code)
     const exactMatch = locations.find((l) => {
       const display = l.ubicacion ?? l.ciudad;
