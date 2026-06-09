@@ -715,7 +715,7 @@ export function DirectoryView() {
       const result = await syncFn() as { data: { synced: number } };
       notify({ title: "Sync completado", body: `${result.data.synced} usuario(s) actualizados con HubSpot y Slack.`, kind: "info" });
     } catch (e: unknown) {
-      notify({ title: "Error en sync", body: e instanceof Error ? e.message : "Error desconocido", kind: "error" });
+      notify({ title: "Error en sync", body: e instanceof Error ? e.message : "Error desconocido", kind: "alert" });
     } finally {
       setSyncing(false);
     }
