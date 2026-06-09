@@ -132,22 +132,22 @@ export function ImportWizard({ onClose, onImported }: Props) {
       const display = l.ubicacion ?? l.ciudad;
       return n(display) === nraw || n(l.ciudad) === nraw || n(l.code) === nraw;
     });
-    if (exactMatch) return exactMatch.ubicacion ?? exactMatch.ciudad;
+    if (exactMatch) return exactMatch.id!;
 
     // If suffix was detected, match city + product category
     const candidates = locations.filter((l) => n(l.ciudad) === base);
-    if (candidates.length === 1) return candidates[0].ubicacion ?? candidates[0].ciudad;
+    if (candidates.length === 1) return candidates[0].id!;
 
     if (candidates.length > 1 && productKeywords.length > 0) {
       const refined = candidates.find((l) => {
         const prod = n(l.producto ?? l.catLabel ?? "");
         return productKeywords.some((kw) => prod.includes(kw));
       });
-      if (refined) return refined.ubicacion ?? refined.ciudad;
+      if (refined) return refined.id!;
     }
 
     // Fall back to first city match or raw value
-    return candidates[0]?.ubicacion ?? candidates[0]?.ciudad ?? raw;
+    return candidates[0]?.id ?? raw;
   }
 
   function resolveRole(raw: string): string {
