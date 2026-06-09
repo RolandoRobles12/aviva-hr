@@ -598,12 +598,14 @@ export function DirectoryView() {
   const [query,    setQuery]    = useState("");
   const [regionF,  setRegionF]  = useState("all");
   const [estadoF,  setEstadoF]  = useState("all");
+  const [puestoF,  setPuestoF]  = useState("all");
   const [sortBy,   setSortBy]   = useState("name");
   const [layout,   setLayout]   = useState<"table" | "grid">("table");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [drawer,   setDrawer]   = useState<(User & { id: string }) | null>(null);
   const [importing, setImporting] = useState(false);
   const [newUserOpen, setNewUserOpen] = useState(false);
+  const [syncing,   setSyncing]   = useState(false);
   const [page,     setPage]     = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [sortDir,  setSortDir]  = useState<"asc" | "desc">("asc");
@@ -650,6 +652,7 @@ export function DirectoryView() {
       if (tab !== "all" && effectiveStatus !== tab) return false;
       if (regionF !== "all" && u.region !== regionF) return false;
       if (estadoF !== "all" && u.estado !== estadoF) return false;
+      if (puestoF !== "all" && u.role  !== puestoF) return false;
       if (query.trim()) {
         const q = norm(query);
         return (
@@ -668,7 +671,7 @@ export function DirectoryView() {
     if (sortBy === "quiosco") arr = [...arr].sort((a, b) => dir * (a.quiosco || "").localeCompare(b.quiosco || ""));
     if (sortBy === "recent")  arr = [...arr].sort((a, b) => dir * (b.hiredAt ?? "").localeCompare(a.hiredAt ?? ""));
     return arr;
-  }, [users, tab, query, regionF, estadoF, sortBy, sortDir]);
+  }, [users, tab, query, regionF, estadoF, puestoF, sortBy, sortDir]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated  = filtered.slice((page - 1) * pageSize, page * pageSize);
@@ -701,6 +704,21 @@ export function DirectoryView() {
 
   function selectAll() {
     setSelected(new Set(filtered.map((u) => u.id)));
+  }
+
+  async function handleSync() {
+    setSyncing(true);
+    try {
+      const { getFunctions, httpsCallable } = await import("firebase/functions");
+      const fns = getFunctions();
+      const syncFn = httpsCallable(fns, "manualIntegrationSync");
+      const result = await syncFn() as { data: { synced: number } };
+      notify({ title: "Sync completado", body: `${result.data.synced} usuario(s) actualizados con HubSpot y Slack.`, kind: "info" });
+    } catch (e: unknown) {
+      notify({ title: "Error en sync", body: e instanceof Error ? e.message : "Error desconocido", kind: "error" });
+    } finally {
+      setSyncing(false);
+    }
   }
 
   if (loading) return <LoadingView />;
@@ -742,6 +760,7 @@ export function DirectoryView() {
             </div>
             <Button variant="secondary" size="sm" icon={<Download size={13} />} onClick={exportCSV}>Exportar CSV</Button>
             <Button variant="secondary" size="sm" icon={<Upload size={13} />} onClick={() => setImporting(true)}>Importar</Button>
+            <Button variant="secondary" size="sm" onClick={handleSync} disabled={syncing}>{syncing ? "Sincronizando…" : "Sync IDs"}</Button>
             <Button variant="primary"   size="sm" icon={<UserPlus size={14} />} onClick={() => setNewUserOpen(true)}>Nueva alta</Button>
           </div>
         </div>
@@ -765,6 +784,13 @@ export function DirectoryView() {
             <option value="all">Todos los estados</option>
             {[...new Set(users.map((u) => u.estado).filter(Boolean))].sort().map((e) => (
               <option key={e} value={e}>{e}</option>
+            ))}
+          </select>
+          <select value={puestoF} onChange={(e) => setPuestoF(e.target.value)}
+            className="h-8 px-2 text-[12.5px] rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-2)] outline-none">
+            <option value="all">Todos los puestos</option>
+            {[...new Set(users.map((u) => u.role).filter(Boolean))].sort().map((r) => (
+              <option key={r} value={r}>{r}</option>
             ))}
           </select>
           <div className="flex items-center gap-1 ml-auto">
