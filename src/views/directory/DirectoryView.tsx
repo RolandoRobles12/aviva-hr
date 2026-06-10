@@ -21,6 +21,8 @@ import {
 } from "@/components/icons";
 import { cn } from "@/lib/cn";
 import { monthsSince } from "@/lib/dates";
+import { functions } from "@/lib/firebase";
+import { httpsCallable } from "firebase/functions";
 
 const AREAS = [
   "Kiosk Acquisitions", "Growth", "Sales", "Operaciones",
@@ -709,11 +711,9 @@ export function DirectoryView() {
   async function handleSync() {
     setSyncing(true);
     try {
-      const { getFunctions, httpsCallable } = await import("firebase/functions");
-      const fns = getFunctions();
-      const syncFn = httpsCallable(fns, "manualIntegrationSync");
-      const result = await syncFn() as { data: { synced: number } };
-      notify({ title: "Sync completado", body: `${result.data.synced} usuario(s) actualizados con HubSpot y Slack.`, kind: "info" });
+      const syncFn = httpsCallable<void, { synced: number }>(functions, "manualIntegrationSync");
+      const result = await syncFn();
+      notify({ title: "Sync completado", body: `${result.data.synced} usuario(s) actualizados con HubSpot y Slack IDs.`, kind: "sync" });
     } catch (e: unknown) {
       notify({ title: "Error en sync", body: e instanceof Error ? e.message : "Error desconocido", kind: "alert" });
     } finally {

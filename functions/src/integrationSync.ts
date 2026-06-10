@@ -1,15 +1,19 @@
 import * as functions from "firebase-functions";
+import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import { WebClient } from "@slack/web-api";
 
+const HUBSPOT_API_KEY = defineSecret("HUBSPOT_API_KEY");
+const SLACK_BOT_TOKEN = defineSecret("SLACK_BOT_TOKEN");
+
 // Callable version for manual sync triggered from the UI
 export const manualIntegrationSync = functions
-  .runWith({ timeoutSeconds: 540, memory: "256MB" })
+  .runWith({ timeoutSeconds: 540, memory: "256MB", secrets: ["HUBSPOT_API_KEY", "SLACK_BOT_TOKEN"] })
   .https.onCall(async (_data, context) => {
     if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Login requerido");
 
-    const hubspotKey = process.env.HUBSPOT_API_KEY;
-    const slackToken = process.env.SLACK_BOT_TOKEN;
+    const hubspotKey = HUBSPOT_API_KEY.value();
+    const slackToken = SLACK_BOT_TOKEN.value();
     if (!hubspotKey || !slackToken) {
       throw new functions.https.HttpsError("failed-precondition", "Faltan variables HUBSPOT_API_KEY o SLACK_BOT_TOKEN");
     }
@@ -49,12 +53,12 @@ const db = admin.firestore();
 // Runs every day at 02:00 AM Mexico City time.
 // Only processes users that still have BOTH hubspot and slackOpsId empty.
 export const dailyIntegrationSync = functions
-  .runWith({ timeoutSeconds: 540, memory: "256MB" })
+  .runWith({ timeoutSeconds: 540, memory: "256MB", secrets: ["HUBSPOT_API_KEY", "SLACK_BOT_TOKEN"] })
   .pubsub.schedule("0 2 * * *")
   .timeZone("America/Mexico_City")
   .onRun(async () => {
-    const hubspotKey  = process.env.HUBSPOT_API_KEY;
-    const slackToken  = process.env.SLACK_BOT_TOKEN;
+    const hubspotKey  = HUBSPOT_API_KEY.value();
+    const slackToken  = SLACK_BOT_TOKEN.value();
 
     if (!hubspotKey || !slackToken) {
       functions.logger.error("dailyIntegrationSync: faltan variables HUBSPOT_API_KEY o SLACK_BOT_TOKEN");
